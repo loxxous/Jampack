@@ -1,0 +1,2 @@
+# Jampack
+Experimental compression algorithm
