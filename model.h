@@ -83,44 +83,4 @@ void Model::UpdateModel()
 	for (int i=0; i < 256; i++) CumFreqs[i+1] = CumFreqs[i] + Freqs[i]; // set the new cumulative table
 }
 
-/*
-    // Compute statistics
-    hist8(in, in_size, F);
-    double p = (double)TOTFREQ/(double)in_size;
-
-    // Normalise so T[i] == TOTFREQ
-    for (m = M = j = 0; j < 256; j++) {
-	if (!F[j])
-	    continue;
-
-	if (m < F[j])
-	    m = F[j], M = j;
-
-	if ((F[j] = F[j]*p+0.499) == 0)
-	    F[j] = 1;
-	fsum += F[j];
-    }
-
-    fsum++; // not needed, but can't remove without removing assert x<TOTFREQ (in old code)
-    int adjust = TOTFREQ - fsum;
-    if (adjust > 0) {
-	F[M] += adjust;
-    } else if (adjust < 0) {
-	if (F[M] > -adjust) {
-	    F[M] += adjust;
-	} else {
-	    adjust += F[M]-1;
-	    F[M] = 1;
-	    for (j = 0; adjust && j < 256; j++) {
-		if (F[j] < 2) continue;
-
-		int d = F[j] > -adjust;
-		int m = d ? adjust : 1-F[j];
-		F[j]   += m;
-		adjust -= m;
-	    }
-	}
-    }
-*/
-
 #endif // MODEL_H
