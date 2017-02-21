@@ -55,7 +55,7 @@ public:
 	// 8-way inverse BWT construction
 	void bwt::inverseBWT(int *MAP, byte *BWT, byte *T, int *len, int *indices)
 	{
-		int remainder = *len % 8; 			// find remainder if any
+		int remainder = *len % 8; 	// find remainder if any
 		int newlen = *len - remainder;	// get the new length of processable data
 		for(int i = 0; i < remainder; i++) T[newlen + i] = BWT[newlen + i];
 
