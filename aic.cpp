@@ -1,5 +1,5 @@
 /*********************************************
-	Adaptive Index Coding (MTF variant)
+* Adaptive Index Coding (MTF variant)
 **********************************************/
 #ifndef coder_H
 #define coder_H
