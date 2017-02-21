@@ -1,8 +1,8 @@
 /*********************************************
-*	ASYMMETRIC BURROWS WHEELER TRANSFORM
+* ASYMMETRIC BURROWS WHEELER TRANSFORM
 *		
-*	Asymmetric BWT uses multiple BWT indexes to allow for multiple decoding streams to interleave without any dependencies.
-*	By default it uses 8-way BWT, this requires the block be a multiple of N, so any odd bytes are left unprocessed.
+* Asymmetric BWT uses multiple BWT indexes to allow for multiple decoding streams to interleave without any dependencies.
+* By default it uses 8-way BWT, this requires the block be a multiple of N, so any odd bytes are left unprocessed.
 **********************************************/
 #ifndef BWT_H
 #define BWT_H
