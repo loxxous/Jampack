@@ -1,9 +1,5 @@
 /*********************************************
-	Adaptive Index Coding
-	It is a variant of MTF where the lower bound of the update (always 0 in MTF)
-	is computed via a (basic) function of distance.
-	This allows for gradual adaption and better frequency distribution while requiring
-	less table updates.
+	Adaptive Index Coding (MTF variant)
 **********************************************/
 #ifndef coder_H
 #define coder_H
@@ -31,7 +27,7 @@ void coder::encode(byte *inbuf, int *size, byte *outbuf, int *out_size)
 		outbuf[i] = idx;
 		if(idx > 0)
 		{
-			int LB = idx >> 1;	// lower bound
+			int LB = idx >> 2; // lower bound
 			do { S2R[P[idx] = P[idx - 1]] = idx; } while(LB < --idx);
 			P[LB] = c;
 			S2R[P[LB] = c] = LB;
@@ -51,7 +47,7 @@ void coder::decode(byte *inbuf, int *size, byte *outbuf, int *out_size)
 		outbuf[i] = c;
 		if(idx > 0)
 		{
-			int LB = idx >> 1;
+			int LB = idx >> 2;
 			do { P[idx] = P[idx - 1]; } while(LB < --idx);
 			P[LB] = c;
 		}
