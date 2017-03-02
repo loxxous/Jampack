@@ -77,7 +77,6 @@ void ANS::encode(Buffer Input, Buffer Output)
 	free(tmp);
 }
 
-// Parallel rANS decoding, read headers sequentially and decode in parallel, wait for all threads to finish.
 void ANS::decode(Buffer Input, Buffer Output, int Threads)
 {
 	Model stats;
