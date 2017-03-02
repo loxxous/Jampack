@@ -36,11 +36,11 @@ void ANS::encode(Buffer Input, Buffer Output)
 		for(; sptr < len; sptr++)
 			stack[sptr] = stats.EncGetRange((int)Input.block[in_p+sptr]);
 		
-        RansState R[4];
-        RansEncInit(&R[0]);
-        RansEncInit(&R[1]);
-        RansEncInit(&R[2]);
-        RansEncInit(&R[3]);
+		RansState R[4];
+		RansEncInit(&R[0]);
+		RansEncInit(&R[1]);
+		RansEncInit(&R[2]);
+		RansEncInit(&R[3]);
 		
 		uint8_t *rans_begin;
 		uint8_t* ptr = tmp+SBufSize; // *end* of temporary buffer
@@ -53,10 +53,10 @@ void ANS::encode(Buffer Input, Buffer Output)
 			R[1] = R[0];
 			R[0] = X;
 		}
-        RansEncFlush(&R[3], &ptr);
-        RansEncFlush(&R[2], &ptr);
-        RansEncFlush(&R[1], &ptr);
-        RansEncFlush(&R[0], &ptr);
+		RansEncFlush(&R[3], &ptr);
+		RansEncFlush(&R[2], &ptr);
+		RansEncFlush(&R[1], &ptr);
+		RansEncFlush(&R[0], &ptr);
 		rans_begin = ptr;
 		int csize = &tmp[SBufSize] - rans_begin;
 		
@@ -94,11 +94,11 @@ void ANS::decode(Buffer Input, Buffer Output, int Threads)
 		
 		uint8_t *rans_begin = &Input.block[in_p];
 		uint8_t* ptr = rans_begin;
-        RansState R[4];
-        RansDecInit(&R[0], &ptr);
-        RansDecInit(&R[1], &ptr);
-        RansDecInit(&R[2], &ptr);
-        RansDecInit(&R[3], &ptr);
+		RansState R[4];
+		RansDecInit(&R[0], &ptr);
+		RansDecInit(&R[1], &ptr);
+		RansDecInit(&R[2], &ptr);
+		RansDecInit(&R[3], &ptr);
 		int sptr = 0;
 		for(sptr = 0; sptr < olen; sptr++)
 		{
