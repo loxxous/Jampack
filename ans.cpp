@@ -13,7 +13,7 @@ public:
 	void encode(Buffer Input, Buffer Output);
 	void decode(Buffer Input, Buffer Output, int Threads);
 private:
-	int StackSize = 128 << 10; 		// Desired block size
+	int StackSize = 128 << 10; 	// Desired block size
 	int SBufSize = (StackSize * 2); // Size of temporary buffer prior to merging
 };
 
@@ -21,7 +21,7 @@ void ANS::encode(Buffer Input, Buffer Output)
 {
 	Model stats;
 	RansEncSymbol *stack = (RansEncSymbol*)calloc(StackSize, sizeof(RansEncSymbol));
-	byte *tmp = (byte*)calloc(SBufSize, sizeof(byte));
+	unsigned char *tmp = (unsigned char*)calloc(SBufSize, sizeof(unsigned char));
 	int in_p = 0;
 	int out_p = 0;
 	
