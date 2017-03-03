@@ -48,10 +48,6 @@ Press 'enter' to continue");
 				}
 			}
 		}
-		if(threads < MIN_THREADS) threads = MIN_THREADS;
-		if(threads > MAX_THREADS) threads = MAX_THREADS;
-		if(blocksize < MIN_BLOCKSIZE) blocksize = MIN_BLOCKSIZE;
-		if(blocksize > MAX_BLOCKSIZE) blocksize = MAX_BLOCKSIZE;
 	}
 	
 	Jampack* Jam = new Jampack();
