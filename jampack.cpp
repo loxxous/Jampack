@@ -61,16 +61,16 @@ public:
 	}
 	
 	static void* CompLaunch(void* object)
-    {
-        Jampack* obj = reinterpret_cast<Jampack*>(object);
-        obj->Comp();
-    }
+    	{
+        	Jampack* obj = reinterpret_cast<Jampack*>(object);
+        	obj->Comp();
+    	}
 	
 	static void* DecompLaunch(void* object)
-    {
-        Jampack* obj = reinterpret_cast<Jampack*>(object);
-        obj->Decomp();
-    }
+    	{
+        	Jampack* obj = reinterpret_cast<Jampack*>(object);
+        	obj->Decomp();
+    	}
 	
 	void ThreadedComp(pthread_t *thread)
 	{
@@ -212,10 +212,10 @@ public:
 	*/
 	void Compress(FILE *in, FILE *out, int t, int bsize)
 	{
-		if (t < MIN_THREADS || !t) t = DEFAULT_THREADS;
-		else if(t > MAX_THREADS ) t = MAX_THREADS;
-		if (bsize < MIN_BLOCKSIZE || !bsize) bsize = DEFAULT_BLOCKSIZE;
-		else if(bsize > MAX_BLOCKSIZE ) bsize = MAX_BLOCKSIZE;
+		if(t < MIN_THREADS) t = MIN_THREADS;
+		if(t > MAX_THREADS) t = MAX_THREADS;
+		if(bsize < MIN_BLOCKSIZE) bsize = MIN_BLOCKSIZE;
+		if(bsize > MAX_BLOCKSIZE) bsize = MAX_BLOCKSIZE;
 		
 		Jampack jam[t];
 		pthread_t threads[t];
@@ -263,8 +263,11 @@ public:
 
 	void Decompress(FILE *in, FILE *out, int t) 
 	{
-		Jampack jam;
-		jam.InitDecomp(t); // Set decoder to run with the selected number of threads
+		if(t < MIN_THREADS) t = MIN_THREADS;
+		if(t > MAX_THREADS) t = MAX_THREADS;
+		
+		Jampack *jam = new Jampack();
+		jam->InitDecomp(t); // Set decoder to run with the selected number of threads
 		
 		uint64_t raw = 0, comp = 0, ri = 0, ro = 0;
 		double ratio;
@@ -274,12 +277,12 @@ public:
 		while(1)
 		{ 
 			if(feof(in)) break;
-			if(jam.DecompReadBlock(in) > 0)
+			if(jam->DecompReadBlock(in) > 0)
 			{
-				ri += *jam.Input.size;		
-				jam.Decomp();
-				jam.DecompWriteBlock(out);
-				ro += *jam.Output.size;			
+				ri += *jam->Input.size;		
+				jam->Decomp();
+				jam->DecompWriteBlock(out);
+				ro += *jam->Output.size;			
 			}
 			
 			cur = clock();
@@ -290,6 +293,7 @@ public:
 			printf("Read: %i MB => %i MB (%.2f%%) @ %.2f MB/s        \r", (int)(raw >> 10), (int)(comp >> 10), ratio, rate);
 		}
 		printf("Read: %i MB => %i MB (%.2f%%)\n", (int)(raw >> 10), (int)(comp >> 10), ratio);
-		jam.FreeDecomp();
+		jam->FreeDecomp();
+		delete jam;
 	}
 };
