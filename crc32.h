@@ -47,12 +47,12 @@ static unsigned int crc32_tab[] = {
 	0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
-unsigned int crc32(byte *buf, size_t size)
+unsigned int crc32(Buffer Input)
 {
     unsigned int crc = 0U;
-	byte *p;
-
-	p = buf;
+	byte *p = Input.block;
+	size_t size = *Input.size;
+	
 	crc = crc ^ ~0U;
 
 	while (size--) crc = crc32_tab[(crc ^ *p++) & 0xFF] ^ (crc >> 8);
