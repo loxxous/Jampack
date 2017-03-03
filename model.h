@@ -18,9 +18,9 @@ private:
 	void StretchAndFit();
 public:
 	// Static functions for block-wise compression
-	int WriteHeader(byte* outbuf, int* olen, int* clen);
-	int ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize);
-	void Build(byte *buf, int len);
+	int WriteHeader(unsigned char* outbuf, int* olen, int* clen);
+	int ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize);
+	void Build(unsigned char *buf, int len);
 	void Clear();
 	// Standard calls
 	void SetEncodeTable();
@@ -61,7 +61,7 @@ void Model::SetDecodeTable(){
 /*
 	Write out a header containing the length of the compressed block and order-0 stats.
 */
-int Model::WriteHeader(byte* outbuf, int* olen, int* clen){
+int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen){
 	int HSize = 0;
 	for(int i = 0; i < AlphabetSize; i++){
 		outbuf[HSize] = Freqs[i] >> 8;
@@ -88,7 +88,7 @@ int Model::WriteHeader(byte* outbuf, int* olen, int* clen){
 	Load tables from buffer into Freqs and CumFreqs, make sure they are valid.
 	Return new position in buffer.
 */
-int Model::ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize){
+int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize){
 	int HSize = 0;
 	for(int i = 0; i < AlphabetSize; i++){
 		Freqs[i] |= inbuf[HSize] << 8;
@@ -125,7 +125,7 @@ int Model::ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize){
 /*
 	Build and Fit statistics for the block
 */
-void Model::Build(byte *buf, int len){
+void Model::Build(unsigned char *buf, int len){
 	for(int i = 0; i < len; i++){
 		Freqs[buf[i]]++;
 	}
