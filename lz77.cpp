@@ -1,5 +1,5 @@
 /*********************************************
-*	LZ77 COMPRESSION AND DECOMPRESSION CODE
+* LZ77 COMPRESSION AND DECOMPRESSION CODE
 **********************************************/
 
 #ifndef LZ77_H
@@ -11,8 +11,8 @@ public:
 	void compress(Buffer Input, Buffer Output, Match *table, int minmatch);
 	void decompress(Buffer Input, Buffer Output);
 private:
-	int encode_leb128(int look_ahead, int match_length, int offset, byte *buf);
-	int decode_leb128(int *look_ahead, int *match_length, int *offset, byte *buf);
+	int encode_leb128(int look_ahead, int match_length, int offset, unsigned char *buf);
+	int decode_leb128(int *look_ahead, int *match_length, int *offset, unsigned char *buf);
 	bool compressible(int look_ahead, int match_len, int offset, int minmatch);
 	const int constants[3] = { 0xff >> 1, (0xffff >> 2) + (0xff >> 1), (0xffffff >> 3) + (0xffff >> 2) + (0xff >> 1) };
 };
@@ -43,7 +43,7 @@ private:
 	*
 	*   After encoding the match information the new position in the output is returned.
 	*/
-	int Lz77::encode_leb128(int look_ahead, int match_length, int offset, byte *buf)
+	int Lz77::encode_leb128(int look_ahead, int match_length, int offset, unsigned char *buf)
 	{
 		short i = 0;
 
@@ -159,7 +159,7 @@ private:
 	* 	If the value is 0 in the match field then there's no more matches and only literals need to be copied out.
 	*	After decoding the match information the new position of the input is returned
 	*/
-	int Lz77::decode_leb128(int *look_ahead, int *match_length, int *offset, byte *buf)
+	int Lz77::decode_leb128(int *look_ahead, int *match_length, int *offset, unsigned char *buf)
 	{
 		short i = 0;
 
