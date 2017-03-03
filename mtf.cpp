@@ -22,12 +22,12 @@ void Postcoder::encode(Buffer Input, Buffer Output)
 	}
 	for(int i = 0; i < *Input.size; i++)
 	{
-		byte c = Input.block[i];
-		byte idx = S2R[c];	
+		unsigned char c = Input.block[i];
+		unsigned char idx = S2R[c];	
 		Output.block[i] = idx;
 		if(idx > 0)
 		{
-			int LB = idx >> 2;	// lower bound
+			int LB = idx >> 2; // lower bound
 			do { S2R[P[idx] = P[idx - 1]] = idx; } while(LB < --idx);
 			P[LB] = c;
 			S2R[P[LB] = c] = LB;
@@ -42,8 +42,8 @@ void Postcoder::decode(Buffer Input, Buffer Output)
 	for(int k = 0; k < 256; k++) P[k] = k;
 	for(int i = 0; i < *Input.size; i++)
 	{
-		byte idx = Input.block[i];
-		byte c = P[idx];
+		unsigned char idx = Input.block[i];
+		unsigned char c = P[idx];
 		Output.block[i] = c;
 		if(idx > 0)
 		{
@@ -55,4 +55,4 @@ void Postcoder::decode(Buffer Input, Buffer Output)
 	*Output.size = *Input.size;
 }
 
-#endif // coder_H
+#endif // postcoder_H
