@@ -16,14 +16,14 @@
 #include "sys_detect.h"
 
 #define DEFAULT_BLOCKSIZE 	16 << 20
-#define MIN_BLOCKSIZE 			1 << 20
-#define MAX_BLOCKSIZE 			256 << 20	// This is limited by the LZ77 precompressor specs
-#define MAX_THREADS				getCoreCount()
-#define MIN_THREADS				1
-#define DEFAULT_THREADS 		((getCoreCount() == 1) ? 1 : getCoreCount() - 1)
-#define HBITS 							20
-#define LZ_ELEMENTS 				1 << HBITS	// The size of the LZ hash table
-#define BWT_UNITS 					840				// The amount of independant parallel units that can process the BWT block
+#define MIN_BLOCKSIZE 		1 << 20
+#define MAX_BLOCKSIZE 		256 << 20	// This is limited by the LZ77 precompressor specs
+#define MAX_THREADS		getCoreCount()
+#define MIN_THREADS		1
+#define DEFAULT_THREADS 	((getCoreCount() == 1) ? 1 : getCoreCount() - 1)
+#define HBITS 			20
+#define LZ_ELEMENTS 		1 << HBITS	// The size of the LZ hash table
+#define BWT_UNITS 		840		// The amount of independant parallel units that can process the BWT block
 
 const char Magic[]="JAM";
 typedef int Index;
