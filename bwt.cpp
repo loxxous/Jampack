@@ -7,7 +7,7 @@
 #ifndef BWT_H
 #define BWT_H
 
-#include "divsufsort.h"
+#include "divsufsort.cpp"
 
 class BlockSort
 {
@@ -65,6 +65,7 @@ class BlockSort
 		static void* Launch(void* object){
 			Parallel_BWT* obj = reinterpret_cast<Parallel_BWT*>(object);
 			obj->Threaded_Inversion();
+			return NULL;
 		}
 		
 		void pThread_Inverse_BWT(pthread_t *thread){
