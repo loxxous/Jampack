@@ -8,15 +8,16 @@
 #include "jampack.cpp"
 
 int main(int argc, char** argv)
-{
+{	
 	if (argc < 4)
 	{
-		printf("Jampack v0.4 by Lucas Marsh (c) 2017\n \n\
+		printf("Jampack v0.5 by Lucas Marsh (c) 2017\n \n\
 Usage: Jampack.exe <c|d> input output <options>\n \n\
 Options:\n\
    -t# : Threads\n\
-   -b# : Block size in MB\n \n\
+   -b# : Block size in MB\n   \n\
 Press 'enter' to continue");
+
 		getchar();
 		return 0;
 	}
@@ -26,7 +27,7 @@ Press 'enter' to continue");
 	FILE* output = fopen(argv[3], "wb");
 	if (output == NULL) return perror(argv[3]), 1;
 	
-	int threads = DEFAULT_THREADS;
+	int threads = MAX_THREADS;
 	int blocksize = DEFAULT_BLOCKSIZE;
 	int cur_opt = 4;
 	if (argc > 4)
@@ -58,7 +59,7 @@ Press 'enter' to continue");
 	{
 		case 'c': Jam->Compress (input, output, threads, blocksize); break;
 		case 'd': Jam->Decompress (input, output, threads); break;
-		default: printf("invalid option!\n"); exit(0);
+		default: printf("Invalid option!\n"); exit(0);
 	}
 	end = clock();
 	double time = ((double)end - (double)start) / CLOCKS_PER_SEC;
