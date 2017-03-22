@@ -8,13 +8,32 @@
 class Lz77
 {
 public:
-	void compress(Buffer Input, Buffer Output, Match *table, int minmatch);
+	void compress(Buffer Input, Buffer Output, int minmatch);
 	void decompress(Buffer Input, Buffer Output);
 private:
 	int encode_leb128(int look_ahead, int match_length, int offset, unsigned char *buf);
 	int decode_leb128(int *look_ahead, int *match_length, int *offset, unsigned char *buf);
 	bool compressible(int look_ahead, int match_len, int offset, int minmatch);
-	const int constants[3] = { 0xff >> 1, (0xffff >> 2) + (0xff >> 1), (0xffffff >> 3) + (0xffff >> 2) + (0xff >> 1) };
+	const unsigned int constants[3] = { 0xff >> 1, (0xffff >> 2) + (0xff >> 1), (0xffffff >> 3) + (0xffff >> 2) + (0xff >> 1) };
+	const unsigned int MAX_RUN = (1 << 28) - 1;
+	
+	// Basic structure for comparing large contexts
+	struct MatchLong{
+		int pos;
+		int ctx;
+	};
+
+	// Used for hashing compressed contexts of up to 32 bytes long
+	static inline int HashLong(int ctx)
+	{
+		return (ctx * 0x9E3779B1) >> (32 - DUPE_HBITS);
+	}
+	
+	// Used for hashing short 4 byte contexts
+	static inline int Hash32(unsigned char *p)
+	{
+		return ((*((const unsigned int*)p)) * 0x9E3779B1) >> (32 - SHORT_HBITS);
+	}
 };
 
 	/* determines if the current state is compressible */
@@ -95,8 +114,11 @@ private:
 	/**
 	*   Compress input block to output block
 	*/
-	void Lz77::compress(Buffer Input, Buffer Output, Match *table, int minmatch)
+	void Lz77::compress(Buffer Input, Buffer Output, int minmatch)
 	{
+		MatchLong *DupeTable;
+		DupeTable = (struct MatchLong*)calloc(LZ_DUPE_ELEMENTS, sizeof(struct MatchLong)); if (DupeTable == NULL) Error("Couldn't allocate dedupe table!");
+		
 		int shift = (minmatch > 32) ? 1 : 32 / minmatch;
 
 		int h = 0;
@@ -107,15 +129,15 @@ private:
 
 		while (pos < *Input.size)
 		{
-			h = Hash(ctx);
-			int prev_pos = table[h].pos;
+			h = HashLong(ctx);
+			int prev_pos = DupeTable[h].pos;
 
-			if ((ctx == table[h].ctx) && ((pos - prev_pos) > 0))
+			if ((ctx == DupeTable[h].ctx) && ((pos - prev_pos) > 0) && (pos - prev_pos) < MAX_RUN)
 			{
 				int m = 0;
 				int off = pos - prev_pos;
 
-				while (Input.block[prev_pos + m] == Input.block[pos + m] && (pos + m + minmatch) < *Input.size) { m++; }
+				while (Input.block[prev_pos + m] == Input.block[pos + m] && (pos + m + minmatch) < *Input.size && m < MAX_RUN) { m++; }
 
 				if (compressible(l, m, off, minmatch))
 				{
@@ -124,9 +146,9 @@ private:
 
 					for (int i = 0; i < m; i++)
 					{
-						h = Hash(ctx);
-						table[h].pos = pos + i;
-						table[h].ctx = ctx;
+						h = HashLong(ctx);
+						DupeTable[h].pos = pos + i;
+						DupeTable[h].ctx = ctx;
 						ctx = (ctx << shift) ^ Input.block[pos + minmatch + i];
 					}
 
@@ -135,8 +157,8 @@ private:
 					l = 0;
 				}
 			}
-			table[h].pos = pos;
-			table[h].ctx = ctx;
+			DupeTable[h].pos = pos;
+			DupeTable[h].ctx = ctx;
 
 			ctx = (ctx << shift) ^ Input.block[pos + minmatch];
 
@@ -148,6 +170,8 @@ private:
 		out_pos += l;
 
 		*Output.size = out_pos;
+		
+		free(DupeTable);
 	}
 
 	/**
