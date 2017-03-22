@@ -7,52 +7,51 @@
 class Postcoder 
 {
 public:
-	void encode(Buffer Input, Buffer Output);
-	void decode(Buffer Input, Buffer Output);
+	void encode(unsigned char *block, int len);
+	void decode(unsigned char *block, int len);
 };
 
-void Postcoder::encode(Buffer Input, Buffer Output)
+void Postcoder::encode(unsigned char *block, int len)
 { 	
-	int P[256];
+	int R2S[256];
 	int S2R[256];
+
 	for(int k = 0; k < 256; k++)
 	{
-		P[k] = k;
+		R2S[k] = k;
 		S2R[k] = k;
 	}
-	for(int i = 0; i < *Input.size; i++)
+	for(int i = 0; i < len; i++)
 	{
-		unsigned char c = Input.block[i];
+		unsigned char c = block[i];
 		unsigned char idx = S2R[c];	
-		Output.block[i] = idx;
+		block[i] = idx;
 		if(idx > 0)
 		{
 			int LB = idx >> 2; // lower bound
-			do { S2R[P[idx] = P[idx - 1]] = idx; } while(LB < --idx);
-			P[LB] = c;
-			S2R[P[LB] = c] = LB;
+			do { S2R[R2S[idx] = R2S[idx - 1]] = idx; } while(LB < --idx);
+			R2S[LB] = c;
+			S2R[R2S[LB] = c] = LB;
 		}
 	}
-	*Output.size = *Input.size;
 }
 
-void Postcoder::decode(Buffer Input, Buffer Output)
+void Postcoder::decode(unsigned char *block, int len)
 {
-	int P[256];
-	for(int k = 0; k < 256; k++) P[k] = k;
-	for(int i = 0; i < *Input.size; i++)
+	int R2S[256];
+	for(int k = 0; k < 256; k++) R2S[k] = k;
+	for(int i = 0; i < len; i++)
 	{
-		unsigned char idx = Input.block[i];
-		unsigned char c = P[idx];
-		Output.block[i] = c;
+		unsigned char idx = block[i];
+		unsigned char c = R2S[idx];
+		block[i] = c;
 		if(idx > 0)
 		{
 			int LB = idx >> 2;
-			do { P[idx] = P[idx - 1]; } while(LB < --idx);
-			P[LB] = c;
+			do { R2S[idx] = R2S[idx - 1]; } while(LB < --idx);
+			R2S[LB] = c;
 		}
 	}
-	*Output.size = *Input.size;
 }
 
 #endif // postcoder_H
