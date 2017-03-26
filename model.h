@@ -27,26 +27,26 @@ private:
 	void InheritStatistics();
 	
 public:
-	int WriteHeader(byte* outbuf, int* olen, int* clen);
-	int ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize);
-	void Build(byte *buf, int len);
-	void BuildRLE0(byte *buf, int len);
+	int WriteHeader(unsigned char* outbuf, int* olen, int* clen);
+	int ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize);
+	void Build(unsigned char *buf, int len);
+	void BuildRLE0(unsigned char *buf, int len);
 	void Clear();
 	void SetEncodeTable();
 	void SetDecodeTable();
-	RansEncSymbol EncGetRange(byte c);
-	RansDecSymbol* DecGetNext(byte c);
+	RansEncSymbol EncGetRange(unsigned char c);
+	RansDecSymbol* DecGetNext(unsigned char c);
 	int DecGetSym(int range);
 };
 
-RansEncSymbol Model::EncGetRange(byte c)
+RansEncSymbol Model::EncGetRange(unsigned char c)
 {
 	RansEncSymbol R = esyms[Chain_1][c];
 	Chain_1 = (c < (Order_1_States - 1)) ? c : Order_1_States - 1;
 	return R;
 }
 
-RansDecSymbol* Model::DecGetNext(byte c)
+RansDecSymbol* Model::DecGetNext(unsigned char c)
 {
 	RansDecSymbol* R = &dsyms[Chain_1][c];
 	Chain_1 = (c < (Order_1_States - 1)) ? c : Order_1_States - 1;
@@ -89,7 +89,7 @@ void Model::SetDecodeTable()
 /*
 	Write out a header containing the length of the compressed block, order-0, and order-1 stats.
 */
-int Model::WriteHeader(byte* outbuf, int* olen, int* clen)
+int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen)
 {
 	// Write out order-0 table
 	int HSize = 0;
@@ -129,7 +129,7 @@ int Model::WriteHeader(byte* outbuf, int* olen, int* clen)
 	Load tables from buffer into Freqs and CumFreqs, make sure they are valid.
 	Return new position in buffer.
 */
-int Model::ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize)
+int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize)
 {
 	int HSize = 0;
 	for(int i = 0; i < AlphabetSize; i++)
@@ -182,7 +182,7 @@ int Model::ReadHeader(byte* inbuf, int* olen, int* clen, int StackSize)
 /*
 	Build statistics for the block
 */
-void Model::Build(byte *buf, int len)
+void Model::Build(unsigned char *buf, int len)
 {
 	unsigned int tmpFrq[AlphabetSize] = {0};
 	int c1 = 0, c = 0;
@@ -215,7 +215,7 @@ void Model::Build(byte *buf, int len)
 /*
 	Build RLE0 statistics for the block
 */
-void Model::BuildRLE0(byte *buf, int len)
+void Model::BuildRLE0(unsigned char *buf, int len)
 {
 	unsigned int tmpFrq[AlphabetSize] = {0};
 	int c1 = 0, c = 0;
