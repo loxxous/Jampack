@@ -135,17 +135,22 @@ class BlockSort
 		{
 			// Adjust thread counts if necessary (shares the workload evenly)
 			int Units = 4;
-			int N_Units = Units * Threads;
-			while ((BWT_UNITS % N_Units) != 0){
-				if (N_Units >= BWT_UNITS){
-					N_Units = Units * Threads;
-					while ((BWT_UNITS % N_Units) != 0){
+			int N_Units = Threads;
+			
+			while ((BWT_UNITS % (N_Units * Units)) != 0)
+			{
+				if ((N_Units * Units) >= BWT_UNITS)
+				{
+					N_Units = Threads;
+					while ((BWT_UNITS % (N_Units * Units)) != 0)
+					{
 						if (N_Units <= 0) Error("Arithmetic error has occurred!");
 						N_Units--;
 					}
 				}
 				N_Units++;
 			}
+			N_Units *= Units;
 			Threads = N_Units / Units;
 			
 			// Compute all the necessities
