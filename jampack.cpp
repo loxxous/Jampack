@@ -4,7 +4,6 @@
 #include "format.h"
 #include "lz77.cpp"
 #include "bwt.cpp"
-#include "mtf.cpp"
 #include "ans.cpp"
 #include "checksum.h"
 
@@ -51,15 +50,15 @@ public:
 	
 	static void* CompLaunch(void* object)
 	{
-        	Jampack* obj = reinterpret_cast<Jampack*>(object);
-        	obj->Comp();
+        Jampack* obj = reinterpret_cast<Jampack*>(object);
+        obj->Comp();
 		return NULL;
 	}
 	
 	static void* DecompLaunch(void* object)
 	{
-        	Jampack* obj = reinterpret_cast<Jampack*>(object);
-        	obj->Decomp();
+        Jampack* obj = reinterpret_cast<Jampack*>(object);
+        obj->Decomp();
 		return NULL;
 	}
 	
@@ -154,8 +153,7 @@ public:
 		if (e == 0 ) return 0;
 		else 
 		{
-			if (BlockSize < MIN_BLOCKSIZE || BlockSize > MAX_BLOCKSIZE || strcmp(Magic_check, Magic) != 0 ||
-			*Input.size < 0 || *Input.size > MAX_BLOCKSIZE)
+			if (BlockSize < MIN_BLOCKSIZE || BlockSize > MAX_BLOCKSIZE || strcmp(Magic_check, Magic) != 0 || *Input.size < 0 || *Input.size > MAX_BLOCKSIZE)
 			{
 				Error("Refusing to read from corrupt header!");
 				return 0;
