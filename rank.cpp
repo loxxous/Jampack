@@ -1,8 +1,5 @@
 /*********************************************
-* Second stage algorithm, Move-to-front fused with WFC.
-* The 8 most recent characters are sorted by their frequency relative to a 
-* fast adapting probability (based on fpaqc's model), all other characters use a MTF 
-* variant which moves the index 75% of the way to the front relative to the previous index.
+* Second stage algorithm.
 **********************************************/
 #ifndef postcoder_H
 #define postcoder_H
@@ -13,7 +10,7 @@ public:
 	void encode(unsigned char *block, int len);
 	void decode(unsigned char *block, int len);
 private:
-	static const int WFC_UPDATE = 8;	// The upper index limit which imposes WFC rules
+	static const int WFC_UPDATE = 8;
 	static const int FREQ_RANGE = 1 << 16;
 	static const int RATE = 3;
 };
@@ -37,9 +34,8 @@ void Postcoder::encode(unsigned char *block, int len)
 		unsigned char idx = S2R[c];	
 		block[i] = idx;
 
-		if(idx < WFC_UPDATE) // Update just the WFC table
+		if(idx < WFC_UPDATE)
 		{
-			// Update frequency ranges
 			for(int k = 0; k < WFC_UPDATE; k++)
 			{
 				if(k == idx)
@@ -67,27 +63,14 @@ void Postcoder::encode(unsigned char *block, int len)
 				}
 			}
 		}
-		else // Update the MTF table
+		else
 		{
 			int LB = idx >> 2;
 			int idx_cpy = idx;
 			do { S2R[R2S[idx_cpy] = R2S[idx_cpy - 1]] = idx_cpy; } while(LB < --idx_cpy);
 			S2R[R2S[LB] = c] = LB;
 		}
-		/*
-		int Cc[256] = {0};
-		for(int p = 0; p < 256; p++)
-		{
-			if(Cc[R2S[p]]++ > 1) Error("broken mtf");
-		}
-		*/
 	}
-	/*
-	printf("Freq: ");
-	for(int p = 0; p < WFC_UPDATE; p++)
-		printf("%i ", S_Freq[p]);
-	printf("\n");
-	*/
 }
 
 void Postcoder::decode(unsigned char *block, int len)
@@ -108,7 +91,6 @@ void Postcoder::decode(unsigned char *block, int len)
 		int LB = idx >> 2;
 		if(idx < WFC_UPDATE)
 		{
-			// Update frequency ranges
 			for(int k = 0; k < WFC_UPDATE; k++)
 			{
 				if(k == idx)
@@ -116,7 +98,6 @@ void Postcoder::decode(unsigned char *block, int len)
 				else
 					S_Freq[k] -= S_Freq[k] >> RATE;
 			}
-			// Sort ranks by frequency of the 8 most recent symbols
 			if(idx > 0)
 			{
 				int j, swap_freq, swap_rank;
