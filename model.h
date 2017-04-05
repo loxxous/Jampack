@@ -1,10 +1,5 @@
 /*********************************************
 * Cumulative Frequency and Statistical Model
-* Notes: order-1 makes pretty much no difference on BWT+WFC+RLE0 data, fast adapting order-0 is best due to the skewed distribution.
-* Implemented as a hybrid of adaptive and semi-static coders chained together.
-* Symbols 0 to 4 use a very fast adapting model with linear lookup, all other symbols are modelled using semi-static rANS.
-* This is done for performance reasons: we only need to care about the first few symbols in the data due to the zipfian distribution, 
-* which means we don't really need to try hard on other symbols greater than like 16 or so. But that also means we can go a bit nuts with the important ranks.
 **********************************************/
 #ifndef MODEL_H
 #define MODEL_H
