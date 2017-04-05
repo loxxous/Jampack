@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 {	
 	if (argc < 4)
 	{
-		printf("Jampack v0.5 by Lucas Marsh (c) 2017\n \n\
+		printf("Jampack v0.6 by Lucas Marsh (c) 2017\n \n\
 Usage: Jampack.exe <c|d> input output <options>\n \n\
 Options:\n\
    -t# : Threads\n\
@@ -21,6 +21,9 @@ Press 'enter' to continue");
 		getchar();
 		return 0;
 	}
+	
+	if(strcmp(argv[2], argv[3]) == 0)
+		Error("Refusing to write to input.");
 	
 	FILE* input = fopen(argv[2], "rb");
 	if (input == NULL) return perror(argv[2]), 1;
