@@ -1,5 +1,10 @@
 /*********************************************
-* CUMULATIVE FREQUENCY AND STATISTICAL MODEL 
+* Cumulative Frequency and Statistical Model
+* Notes: order-1 makes pretty much no difference on BWT+WFC+RLE0 data, fast adapting order-0 is best due to the skewed distribution.
+* Implemented as a hybrid of adaptive and semi-static coders chained together.
+* Symbols 0 to 4 use a very fast adapting model with linear lookup, all other symbols are modelled using semi-static rANS.
+* This is done for performance reasons: we only need to care about the first few symbols in the data due to the zipfian distribution, 
+* which means we don't really need to try hard on other symbols greater than like 16 or so. But that also means we can go a bit nuts with the important ranks.
 **********************************************/
 #ifndef MODEL_H
 #define MODEL_H
@@ -7,12 +12,12 @@
 class Model
 {
 public:
-    static const unsigned int ProbBits = 15; 
+    static const unsigned int ProbBits = 15; // Max accuracy, 16 can cause overflow in 16 bit type due to 1 << 16
     static const unsigned int ProbScale = 1 << ProbBits;
 	
 private:
-	static const unsigned int Order_1_States = 3;
-	static const unsigned int Order_0_state = Order_1_States - 1;
+	static const unsigned int Order_1_States = 1;
+	static const unsigned int Order_0_State = Order_1_States - 1;
 	static const unsigned int AlphabetSize = 257;
 	
 	unsigned int Freqs[Order_1_States][AlphabetSize] = {{0}};
@@ -20,33 +25,32 @@ private:
 	unsigned int CumFreqs[Order_1_States][AlphabetSize + 1] = {{0}};
 	unsigned int Chain_1 = 0;
 	
-	unsigned char cum2sym[Order_1_States][ProbScale];
+	unsigned short cum2sym[Order_1_States][ProbScale];
 	RansEncSymbol esyms[Order_1_States][AlphabetSize];
 	RansDecSymbol dsyms[Order_1_States][AlphabetSize];
 	void StretchAndFitFreqs();
 	void InheritStatistics();
-	
+
 public:
-	int WriteHeader(unsigned char* outbuf, int* olen, int* clen);
-	int ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize);
-	void Build(unsigned char *buf, int len);
-	void BuildRLE0(unsigned char *buf, int len);
+	int WriteHeader(unsigned char* outbuf, int* olen, int* clen, int* rlen);
+	int ReadHeader(unsigned char* inbuf, int* olen, int* clen, int* rlen, int StackSize);
+	void Build(unsigned short *buf, int len);
 	void Clear();
 	void SetEncodeTable();
 	void SetDecodeTable();
-	RansEncSymbol EncGetRange(unsigned char c);
-	RansDecSymbol* DecGetNext(unsigned char c);
+	RansEncSymbol EncGetRange(unsigned short c);
+	RansDecSymbol* DecGetNext(unsigned short c);
 	int DecGetSym(int range);
 };
 
-RansEncSymbol Model::EncGetRange(unsigned char c)
+RansEncSymbol Model::EncGetRange(unsigned short c)
 {
 	RansEncSymbol R = esyms[Chain_1][c];
 	Chain_1 = (c < (Order_1_States - 1)) ? c : Order_1_States - 1;
 	return R;
 }
 
-RansDecSymbol* Model::DecGetNext(unsigned char c)
+RansDecSymbol* Model::DecGetNext(unsigned short c)
 {
 	RansDecSymbol* R = &dsyms[Chain_1][c];
 	Chain_1 = (c < (Order_1_States - 1)) ? c : Order_1_States - 1;
@@ -89,14 +93,14 @@ void Model::SetDecodeTable()
 /*
 	Write out a header containing the length of the compressed block, order-0, and order-1 stats.
 */
-int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen)
+int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen, int* rlen)
 {
 	// Write out order-0 table
 	int HSize = 0;
 	for(int i = 0; i < AlphabetSize; i++)
 	{
-		outbuf[HSize] = PreInheritedFreqs[Order_0_state][i] >> 8;
-		outbuf[HSize+1] = PreInheritedFreqs[Order_0_state][i] & 0xFF;
+		outbuf[HSize] = PreInheritedFreqs[Order_0_State][i] >> 8;
+		outbuf[HSize+1] = PreInheritedFreqs[Order_0_State][i] & 0xFF;
 		HSize += sizeof(uint16_t);
 	}
 	// Write out order-1 table
@@ -122,6 +126,12 @@ int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen)
 	outbuf[HSize++] = (*clen >> 8) & 0xff;
 	outbuf[HSize++] = (*clen >> 0) & 0xff;
 	
+	// Write out size of rle buffer
+	outbuf[HSize++] = (*rlen >> 24) & 0xff;
+	outbuf[HSize++] = (*rlen >> 16) & 0xff;
+	outbuf[HSize++] = (*rlen >> 8) & 0xff;
+	outbuf[HSize++] = (*rlen >> 0) & 0xff;
+	
 	return HSize;
 }
 
@@ -129,13 +139,13 @@ int Model::WriteHeader(unsigned char* outbuf, int* olen, int* clen)
 	Load tables from buffer into Freqs and CumFreqs, make sure they are valid.
 	Return new position in buffer.
 */
-int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize)
+int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int* rlen, int StackSize)
 {
 	int HSize = 0;
 	for(int i = 0; i < AlphabetSize; i++)
 	{
-		Freqs[Order_0_state][i] |= inbuf[HSize] << 8;
-		Freqs[Order_0_state][i] |= inbuf[HSize+1];
+		Freqs[Order_0_State][i] |= inbuf[HSize] << 8;
+		Freqs[Order_0_State][i] |= inbuf[HSize+1];
 		HSize += sizeof(uint16_t);
 	}
 	for(int j = 0; j < Order_1_States - 1; j++)
@@ -174,7 +184,12 @@ int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize)
 	*clen = inbuf[HSize++] << 24;
 	*clen |= inbuf[HSize++] << 16;
 	*clen |= inbuf[HSize++] << 8;
-	*clen |= inbuf[HSize++] << 0;
+	*clen |= inbuf[HSize++] << 0;	
+	
+	*rlen = inbuf[HSize++] << 24;
+	*rlen |= inbuf[HSize++] << 16;
+	*rlen |= inbuf[HSize++] << 8;
+	*rlen |= inbuf[HSize++] << 0;
 
 	return HSize;
 }
@@ -182,69 +197,33 @@ int Model::ReadHeader(unsigned char* inbuf, int* olen, int* clen, int StackSize)
 /*
 	Build statistics for the block
 */
-void Model::Build(unsigned char *buf, int len)
+void Model::Build(unsigned short *buf, int len)
 {
 	unsigned int tmpFrq[AlphabetSize] = {0};
-	int c1 = 0, c = 0;
+	unsigned short c1 = 0, c = 0;
 	for(int i = 0; i < len; i++)
 	{
 		c = buf[i];
 		Freqs[c1][c]++;
 		tmpFrq[c]++;
+		if(!(c < AlphabetSize)) Error("Read an invalid symbol!");
 		c1 = (c < Order_1_States - 1) ? c : Order_1_States - 1;
 	}
 	
 	// Inform lower order about high orders that will inherit 
 	for(int k = Order_1_States; k < AlphabetSize; k++)
-		if(Freqs[Order_0_state][k] == 0 && tmpFrq[k] > 0)
-			Freqs[Order_0_state][k] = 1;
+		if(Freqs[Order_0_State][k] == 0 && tmpFrq[k] > 0)
+			Freqs[Order_0_State][k] = 1;
 		
 	// Remove high order redundancy (The header stores only a few high order contexts)
 	for(int j = 0; j < Order_1_States - 1; j++)
 		for(int k = Order_1_States; k < AlphabetSize; k++)
 			Freqs[j][k] = 0;
 	
-	StretchAndFitFreqs(); // Quantize and scaled to fit 2^15, stored in header
-	
+	StretchAndFitFreqs(); // Quantize and scaled to fit 2^15, this gets stored in the header
 	memcpy(PreInheritedFreqs, Freqs, AlphabetSize * Order_1_States * sizeof(unsigned int)); 
-	
-	InheritStatistics();
-	StretchAndFitFreqs();
-}
-
-/*
-	Build RLE0 statistics for the block
-*/
-void Model::BuildRLE0(unsigned char *buf, int len)
-{
-	unsigned int tmpFrq[AlphabetSize] = {0};
-	int c1 = 0, c = 0;
-	for(int i = 0; i < len; i++)
-	{
-		// TODO
-		
-		c = buf[i];
-		Freqs[c1][c]++;
-		tmpFrq[c]++;
-		c1 = (c < Order_1_States - 1) ? c : Order_1_States - 1;
-	}
-	
-	// Inform lower order about high orders that will inherit 
-	for(int k = Order_1_States; k < AlphabetSize; k++)
-		if(Freqs[Order_0_state][k] == 0 && tmpFrq[k] > 0)
-			Freqs[Order_0_state][k] = 1;
-		
-	// Remove high order redundancy (The header stores only a few high order contexts)
-	for(int j = 0; j < Order_1_States - 1; j++)
-		for(int k = Order_1_States; k < AlphabetSize; k++)
-			Freqs[j][k] = 0;
-	
-	StretchAndFitFreqs(); // Quantize and scaled to fit 2^15
-	
-	memcpy(PreInheritedFreqs, Freqs, AlphabetSize * Order_1_States * sizeof(unsigned int)); 
-	
-	InheritStatistics();
-	StretchAndFitFreqs();
+	InheritStatistics(); // Build statistics from the header data
+	StretchAndFitFreqs(); 
 }
 
 /*
@@ -254,8 +233,8 @@ void Model::InheritStatistics()
 {
 	for(int j = 0; j < Order_1_States - 1; j++)
 		for(int k = Order_1_States; k < AlphabetSize; k++)
-			if(Freqs[Order_0_state][k] > 0)
-				Freqs[j][k] = (Freqs[Order_0_state][k] / (Order_1_States - j)) + 1;
+			if(Freqs[Order_0_State][k] > 0)
+				Freqs[j][k] = (Freqs[Order_0_State][k] / (Order_1_States - j)) + 1;
 }
 
 void Model::StretchAndFitFreqs()
