@@ -28,7 +28,7 @@ class BlockSort
 	};
 	public:
 	#ifdef __CUDACC__
-	__device__ void CUDA_Threaded_Launch(Parallel_BWT* pBWT, int Threads);
+	__host__ __device__ void CUDA_Threaded_Launch(Parallel_BWT* pBWT, int Threads);
 	#endif
 };
 #endif // BWT_H
