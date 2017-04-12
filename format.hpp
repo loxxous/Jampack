@@ -30,7 +30,7 @@
 #define SHORT_HBITS 		18	// The size of the LZ short match table
 #define LZ_DUPE_ELEMENTS 	1 << DUPE_HBITS	
 #define LZ_SHORT_ELEMENTS 	1 << SHORT_HBITS
-#define BWT_UNITS 		840		// The amount of independant parallel units that can process the BWT block
+#define BWT_UNITS 		840	// The amount of independant parallel units that can process the BWT block
 #define MAX_GPU_RESOURCES	0.80	// Use up to 80% of GPU memory
 
 static const char Magic[]="JAM";
