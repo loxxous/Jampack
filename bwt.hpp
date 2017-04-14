@@ -13,7 +13,7 @@ namespace BlockSort
 	{
 		public:
 		void ForwardBWT(Buffer Input, Buffer Output, Index *Indicies);
-		void InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads);
+		void InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGPU);
 		
 		class ParallelBWT
 		{
