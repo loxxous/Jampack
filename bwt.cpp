@@ -3,7 +3,7 @@
 **********************************************/
 #include "bwt.hpp"
 
-void BlockSort::Parallel_BWT::Load(unsigned char *_BWT, unsigned char *_T, int _Step, Index *_p, Index _Idx, Index* _MAP, int *_Offset, int _Start, int _End, int _NU)
+void BlockSort::BWT::ParallelBWT::Load(unsigned char *_BWT, unsigned char *_T, int _Step, Index *_p, Index _Idx, Index* _MAP, int *_Offset, int _Start, int _End, int _NU)
 {
 	BWT = _BWT; 
 	T = _T; 
@@ -30,7 +30,7 @@ void BlockSort::Parallel_BWT::Load(unsigned char *_BWT, unsigned char *_T, int _
 		Offset[i] = Offset[i] - initpos;
 }
 
-void BlockSort::Parallel_BWT::Threaded_Inversion()
+void BlockSort::BWT::ParallelBWT::ThreadedInversion()
 {
 	for (int i = 0; i != Step; i++)
 	{
@@ -45,29 +45,21 @@ void BlockSort::Parallel_BWT::Threaded_Inversion()
 }
 
 #ifdef __CUDACC__
-__device__ void BlockSort::Parallel_BWT::CUDA_Threaded_Inversion()
+__global__ void BlockSort::CUDAInverse(int Threads, unsigned char *BWT, unsigned char *T, int Step, Index *p, Index Idx, Index* MAP, int *Offset)
 {
-	for (int i = 0; i != Step; i++)
+	int j = threadIdx.x;
+	if(j < Threads)
 	{
-		for (int j = Start; j != End; j++)
+		for (int i = 0; i != Step; i++)
 		{
 			p[j] = MAP[p[j] - 1];
 			T[i + Offset[j]] = BWT[p[j] - (p[j] >= Idx)];
 		}
 	}
-	cudaFree(p);
-	cudaFree(Offset);
-}
-
-__host__ __device__ void BlockSort::CUDA_Threaded_Launch(Parallel_BWT* pBWT, int Threads)
-{
-	int i = threadIdx.x;
-	if(i <= Threads)
-		pBWT[i].CUDA_Threaded_Inversion();
 }
 #endif
 
-void BlockSort::ForwardBWT(Buffer Input, Buffer Output, Index *Indicies)
+void BlockSort::BWT::ForwardBWT(Buffer Input, Buffer Output, Index *Indicies)
 {
 	unsigned char *T = Input.block;
 	unsigned char* BWT = Output.block;
@@ -109,7 +101,7 @@ void BlockSort::ForwardBWT(Buffer Input, Buffer Output, Index *Indicies)
 	Easiest solution is to have the maximum allowed threads be a least common multiple of common thread counts.
 	840 is a nice multiple of 1, 2, 3, 4, 5, 6, 7, and 8. Which is perfect for CPU threading, and GPU threading.
 */
-void BlockSort::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads)
+void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads)
 {
 	unsigned char *BWT = Input.block;
 	unsigned char *T = Output.block;
@@ -128,10 +120,11 @@ void BlockSort::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Thr
 
 		#ifdef __CUDACC__
 		bool InvertOnGPU = false;
+		
 		if(CheckCUDASupport() == true)
-		{		
+		{
 			uint64_t CUDAMemory = GetCUDAMemory();
-			if((CUDAMemory * MAX_GPU_RESOURCES) < (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
+			if((CUDAMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
 			{
 				Units = 1;
 				uint64_t CUDACores = GetCUDACoreCount();
@@ -210,7 +203,7 @@ void BlockSort::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Thr
 			offset[i] = step * i;
 
 		// INVERT 
-		Parallel_BWT* pBWT = new Parallel_BWT[Threads];			
+		ParallelBWT* pBWT = new ParallelBWT[Threads];			
 		for(int n = 0; n < Threads; n++)
 		{
 			int start = n * Units;
@@ -221,14 +214,14 @@ void BlockSort::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Thr
 		#ifdef __CUDACC__
 		if(InvertOnGPU == true)
 		{
-			Parallel_BWT* CUDABWT;
+			ParallelBWT* CUDABWT;
 			unsigned char *d_BWT;
 			unsigned char *d_T;
 			Index* d_p;
 			Index* d_offset;
 			Index* d_MAP;
-			
-			cudaMalloc(&CUDABWT, sizeof(Parallel_BWT) * Threads);
+
+			cudaMalloc(&CUDABWT, sizeof(ParallelBWT) * Threads);
 			cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_T, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_MAP, sizeof(Index) * newLen); 
@@ -238,37 +231,34 @@ void BlockSort::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Thr
 			cudaMemcpy(d_BWT, BWT, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice);			
 			cudaMemcpy(d_T, T, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice);
 			cudaMemcpy(d_MAP, MAP, sizeof(Index) * newLen, cudaMemcpyHostToDevice);
-			
-			for(int n = 0; n < Threads; n++)
-			{
-				int start = n * Units;
-				int end = (n+1) * Units;
-				CUDABWT[n].Load(d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0], start, end, N_Units);
-			}
-			
-			CUDA_Threaded_Launch<<< 1 , Threads >>>(CUDABWT, Threads);
+			cudaMemcpy(d_p, p, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
+			cudaMemcpy(d_offset, offset, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
 
+			dim3 dimGrid(1, 1);
+			dim3 dimBlock(Threads, 1);
+			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
+			
 			cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost);
 			
 			cudaFree(CUDABWT);
 			cudaFree(d_BWT);
 			cudaFree(d_T);
+			cudaFree(d_MAP);
 			cudaFree(d_p);
 			cudaFree(d_offset);
-			cudaFree(d_MAP);
 		}
 		else
 		{
 			#pragma omp parallel for num_threads(Threads) 
 			for(int n = 0; n < Threads; n++)
-			pBWT[n].Threaded_Inversion();
+			pBWT[n].ThreadedInversion();
 		}
 		#endif
 		
 		#ifndef __CUDACC__
 		#pragma omp parallel for num_threads(Threads) 
 		for(int n = 0; n < Threads; n++)
-			pBWT[n].Threaded_Inversion();
+			pBWT[n].ThreadedInversion();
 		#endif
 		
 		delete[] p;
