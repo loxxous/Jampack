@@ -214,14 +214,12 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		if(InvertOnGPU == true)
 		{
-			ParallelBWT* CUDABWT;
 			unsigned char *d_BWT;
 			unsigned char *d_T;
 			Index* d_p;
 			Index* d_offset;
 			Index* d_MAP;
 
-			cudaMalloc(&CUDABWT, sizeof(ParallelBWT) * Threads);
 			cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_T, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_MAP, sizeof(Index) * newLen); 
@@ -240,7 +238,6 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 			
 			cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost);
 			
-			cudaFree(CUDABWT);
 			cudaFree(d_BWT);
 			cudaFree(d_T);
 			cudaFree(d_MAP);
