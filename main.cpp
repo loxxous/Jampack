@@ -15,7 +15,8 @@ int main(int argc, char** argv)
 Usage: Jampack.exe <c|d> input output <options>\n \n\
 Options:\n\
    -t# : Threads\n\
-   -b# : Block size in MB\n   \n\
+   -b# : Block size in MB\n\
+   -g# : Enable GPU decoding\n   \n\
 Press 'enter' to continue", JAM_VERSION);
 
 		getchar();
@@ -32,6 +33,7 @@ Press 'enter' to continue", JAM_VERSION);
 	
 	int threads = MAX_THREADS;
 	int blocksize = DEFAULT_BLOCKSIZE;
+	bool gpu = false;
 	int cur_opt = 4;
 	if (argc > 4)
 	{
@@ -47,6 +49,7 @@ Press 'enter' to continue", JAM_VERSION);
 					{
 						case 'b': blocksize = atoi(p+1) << 20; break;
 						case 't': threads = atoi(p+1); break;
+						case 'g': gpu = true; break;
 					}
 					p++;
 				}
@@ -61,7 +64,7 @@ Press 'enter' to continue", JAM_VERSION);
 	switch (argv[1][0])
 	{
 		case 'c': Jam->Compress (input, output, threads, blocksize); break;
-		case 'd': Jam->Decompress (input, output, threads); break;
+		case 'd': Jam->Decompress (input, output, threads, gpu); break;
 		default: printf("Invalid option!\n"); exit(0);
 	}
 	printf("Completed in %.2f seconds\n",  ((double)clock() - (double)start) / CLOCKS_PER_SEC);
