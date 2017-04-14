@@ -25,7 +25,7 @@ void Jampack::Decomp()
 void Jampack::InitComp(int bsize)
 {
 	entropy = new ANS();
-	bwt = new BlockSort();
+	bwt = new BlockSort::BWT();
 	lz = new Lz77();
 	Chk = new Checksum();
 		
@@ -45,7 +45,7 @@ void Jampack::InitDecomp(int t)
 {
 	Threads = t;
 	entropy = new ANS();
-	bwt = new BlockSort();
+	bwt = new BlockSort::BWT();
 	lz = new Lz77();
 	Chk = new Checksum();
 	Indices = (int*)calloc(BWT_UNITS, sizeof(int));
