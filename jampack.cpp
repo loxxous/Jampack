@@ -17,7 +17,7 @@ void Jampack::Comp()
 void Jampack::Decomp()
 {
 	entropy->decode(Input, Output, Threads);
-	bwt->InverseBWT(Output, Input, Indices, Threads);
+	bwt->InverseBWT(Output, Input, Indices, Threads, GPU);
 	lz->decompress(Input, Output);	
 	if(crc != Chk->IntegrityCheck(Output)) Error("Detected corrupt block!"); 
 }
@@ -41,8 +41,9 @@ void Jampack::InitComp(int bsize)
 	Output.size = (int*)calloc(1, sizeof(int));
 }
 	
-void Jampack::InitDecomp(int t)
+void Jampack::InitDecomp(int t, bool gpu)
 {
+	GPU = gpu;
 	Threads = t;
 	entropy = new ANS();
 	bwt = new BlockSort::BWT();
@@ -185,13 +186,13 @@ void Jampack::Compress(FILE *in, FILE *out, int t, int bsize)
 	delete[] jam;
 }
 
-void Jampack::Decompress(FILE *in, FILE *out, int t) 
+void Jampack::Decompress(FILE *in, FILE *out, int t, bool gpu) 
 {
 	if(t < MIN_THREADS) t = MIN_THREADS;
 	if(t > MAX_THREADS) t = MAX_THREADS;
 	
 	Jampack *jam = new Jampack();
-	jam->InitDecomp(t); // Set decoder to run with the selected number of threads
+	jam->InitDecomp(t, gpu); // Set decoder to run with the selected number of threads on cpu or gpu
 		
 	uint64_t raw = 0, comp = 0, ri = 0, ro = 0;
 	double ratio;
