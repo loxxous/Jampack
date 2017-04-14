@@ -17,7 +17,7 @@ class Jampack
 	Buffer Output;
 	
 	private:
-	BlockSort *bwt;
+	BlockSort::BWT *bwt;
 	Lz77 *lz;
 	ANS *entropy;
 	Index BlockSize;
