@@ -24,6 +24,7 @@ class Jampack
 	Index *Indices;
 	Checksum *Chk;
 	int Threads;
+	bool GPU;
 	unsigned char cmethod;
 	unsigned char fmethod;
 	unsigned int crc;
@@ -32,7 +33,7 @@ class Jampack
 	void Comp(); // Compress buffer
 	void Decomp(); // Decompress buffer
 	void InitComp(int bsize); // initialize compressor with blocksize bsize
-	void InitDecomp(int t); // Initialize decoder with t threads
+	void InitDecomp(int t, bool gpu); // Initialize decoder with t threads on either cpu or gpu
 	void Free(); // Release memory from the compressor or decompressor
 	
 	int CompReadBlock(FILE *in); // Read raw input to compressor
@@ -43,6 +44,6 @@ class Jampack
 	void DisplayHeaderContents(); // Only really used for debugging
 	
 	void Compress(FILE *in, FILE *out, int t, int bsize); // Compress input file to output file with t threads and blocksize bsize
-	void Decompress(FILE *in, FILE *out, int t); // Decompress input to output with t internal threads
+	void Decompress(FILE *in, FILE *out, int t, bool gpu); // Decompress input to output with t internal threads
 };
 #endif // JAM_H //
