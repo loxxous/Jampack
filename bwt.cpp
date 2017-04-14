@@ -101,7 +101,7 @@ void BlockSort::BWT::ForwardBWT(Buffer Input, Buffer Output, Index *Indicies)
 	Easiest solution is to have the maximum allowed threads be a least common multiple of common thread counts.
 	840 is a nice multiple of 1, 2, 3, 4, 5, 6, 7, and 8. Which is perfect for CPU threading, and GPU threading.
 */
-void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads)
+void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGPU)
 {
 	unsigned char *BWT = Input.block;
 	unsigned char *T = Output.block;
@@ -121,7 +121,7 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		bool InvertOnGPU = false;
 		
-		if(CheckCUDASupport() == true)
+		if(CheckCUDASupport() == true && UseGPU == true)
 		{
 			uint64_t CUDAMemory = GetCUDAMemory();
 			if((CUDAMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
