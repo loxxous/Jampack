@@ -39,7 +39,7 @@ void ANS::Parallel_ANS::Threaded_Decode()
 		R[3] = X;
 	}
 	stats->Clear();
-		RLE *rle0 = new RLE(); if(rle0 == NULL) Error("Couldn't allocate rle0!");
+	RLE *rle0 = new RLE(); if(rle0 == NULL) Error("Couldn't allocate rle0!");
 	rle0->decode(rlebuf, &Output.block[out_p], &rlen, olen);
 	delete rle0;
 	free(rlebuf);
