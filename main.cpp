@@ -16,7 +16,7 @@ Usage: Jampack.exe <c|d> input output <options>\n \n\
 Options:\n\
    -t# : Threads\n\
    -b# : Block size in MB\n\
-   -g# : Enable GPU decoding\n   \n\
+   -g : Enable GPU decoding\n   \n\
 Press 'enter' to continue", JAM_VERSION);
 
 		getchar();
