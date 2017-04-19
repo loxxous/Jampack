@@ -26,7 +26,7 @@ namespace BlockSort
 		};
 	};
 	#ifdef __CUDACC__
-	__global__ void CUDAInverse(int Threads, unsigned char *BWT, unsigned char *T, int Step, Index *p, Index Idx, Index* MAP, int *Offset);
+	__global__ void CUDAInverse(int Threads, int Units, unsigned char *BWT, unsigned char *T, int Step, Index *p, Index Idx, Index* MAP, int *Offset);
 	#endif
 };
 #endif // BWT_H
