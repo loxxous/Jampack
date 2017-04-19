@@ -45,4 +45,9 @@ struct Buffer
 
 extern void Error(const char *string);
 
+#ifdef __CUDACC__
+#define cudaAssert(condition) \
+  if (condition != cudaSuccess){ printf("Cuda assertion %s failed!\n", #condition); exit(-1); }
+#endif
+
 #endif // FORMAT_H
