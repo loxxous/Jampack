@@ -101,7 +101,7 @@ void BlockSort::BWT::ForwardBWT(Buffer Input, Buffer Output, Index *Indicies)
 	Easiest solution is to have the maximum allowed threads be a least common multiple of common thread counts.
 	840 is a nice multiple of 1, 2, 3, 4, 5, 6, 7, and 8. Which is perfect for CPU threading, and GPU threading.
 */
-void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGPU)
+void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGpu)
 {
 	unsigned char *BWT = Input.block;
 	unsigned char *T = Output.block;
@@ -121,22 +121,21 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		bool InvertOnGPU = false;
 		
-		if(CheckCUDASupport() == true && UseGPU == true)
+		if(CheckCudaSupport() == true && UseGpu == true)
 		{
-			uint64_t CUDAMemory = GetCUDAMemory();
-			if((CUDAMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
+			uint64_t CudaMemory = GetCudaMemory();
+			if((CudaMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
 			{
 				Units = 1;
-				uint64_t CUDACores = GetCUDACoreCount();
-				if(CUDACores >= BWT_UNITS)
+				uint64_t CudaCores = GetCudaCoreCount();
+				if(CudaCores >= BWT_UNITS)
 					N_Units = Threads = BWT_UNITS;
 				else
-					N_Units = Threads = CUDACores;
+					N_Units = Threads = CudaCores;
 				InvertOnGPU = true;
 			}
 		}
 		#endif
-		
 		while ((BWT_UNITS % (N_Units * Units)) != 0)
 		{
 			if ((N_Units * Units) >= BWT_UNITS)
@@ -156,8 +155,8 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		Threads = N_Units / Units;
 		
 		// Compute all the necessities
-		Index* MAP = (Index*)calloc(newLen, sizeof(Index)); if (MAP == NULL) Error("Couldn't allocate index map!");
-		
+		Index* MAP = (Index*)malloc(sizeof(Index) * newLen); if (MAP == NULL) Error("Couldn't allocate index map!");		
+			
 		Index idx = Indicies[0];
 		Index count[257] = { 0 };
 		
@@ -189,10 +188,10 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		}
 		for (Index i = 1; i < 256; ++i) 
 		count[i] += count[i - 1];
-	
+		
 		for (Index i = 0; i < newLen; ++i)
 			MAP[count[BWT[i]]++] = i + (i >= idx);
-
+		
 		Index step = newLen / N_Units;
 		Index* p = new Index[N_Units]; 
 		Index* offset = new Index[N_Units]; 
@@ -214,15 +213,12 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		if(InvertOnGPU == true)
 		{
-			time_t start = clock();
-			ParallelBWT* CUDABWT;
 			unsigned char *d_BWT;
 			unsigned char *d_T;
 			Index* d_p;
 			Index* d_offset;
 			Index* d_MAP;
-			
-			cudaMalloc(&CUDABWT, sizeof(ParallelBWT) * Threads);
+
 			cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_T, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_MAP, sizeof(Index) * newLen); 
@@ -236,32 +232,31 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 			cudaMemcpy(d_offset, offset, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
 			
 			int TryUnits = 100;
-			int CUDAUnits = TryUnits;
+			int CudaUnits = TryUnits;
 			
-			while ((Threads % CUDAUnits) != 0)
+			while ((Threads % CudaUnits) != 0)
 			{
-				if (CUDAUnits >= BWT_UNITS)
+				if (CudaUnits >= BWT_UNITS)
 				{
-					CUDAUnits = TryUnits;
-					while ((Threads % CUDAUnits) != 0)
+					CudaUnits = TryUnits;
+					while ((Threads % CudaUnits) != 0)
 					{
-						if (CUDAUnits <= 0) Error("Arithmetic error has occurred!");
-						CUDAUnits--;
+						if (CudaUnits <= 0) Error("Arithmetic error has occurred!");
+						CudaUnits--;
 					}
-					if((Threads % CUDAUnits) == 0) goto found;
+					if((Threads % CudaUnits) == 0) goto found;
 				}
-				CUDAUnits++;
+				CudaUnits++;
 			}
 			found:
 			
-			dim3 dimGrid(CUDAUnits);
-			dim3 dimBlock(Threads/CUDAUnits);
+			dim3 dimGrid(CudaUnits);
+			dim3 dimBlock(Threads/CudaUnits);
 			
-			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, CUDAUnits, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
+			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, CudaUnits, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
 			
 			cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost);
 			
-			cudaFree(CUDABWT);
 			cudaFree(d_BWT);
 			cudaFree(d_T);
 			cudaFree(d_MAP);
