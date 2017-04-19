@@ -1,5 +1,7 @@
 /*********************************************
 * Detects Hardware for Windows, Mac OS, UNIX, and NVidia accelerated platforms.
+* The System namespace allows us to skip querying the OS and external libraries once we already know the hardware.
+* Querying the Cuda library is very costly and is only ever done once.
 **********************************************/
 #ifndef SYS_DETECT_H
 #define SYS_DETECT_H
@@ -20,11 +22,12 @@ extern uint64_t GetCoreCount();
 extern uint64_t GetAvailableMemory();
 
 #ifdef __CUDACC__
-extern bool CheckCUDASupport();
+extern bool CheckCudaSupport();
 
-extern uint64_t GetCUDACoreCount();
+extern uint64_t GetCudaCoreCount();
 
-extern uint64_t GetCUDAMemory();
+extern uint64_t GetCudaMemory();
+
 #endif
 
 #endif // SYS_DETECT_H
