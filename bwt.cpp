@@ -45,9 +45,9 @@ void BlockSort::BWT::ParallelBWT::ThreadedInversion()
 }
 
 #ifdef __CUDACC__
-__global__ void BlockSort::CUDAInverse(int Threads, unsigned char *BWT, unsigned char *T, int Step, Index *p, Index Idx, Index* MAP, int *Offset)
+__global__ void BlockSort::CUDAInverse(int Threads, int Units, unsigned char *BWT, unsigned char *T, int Step, Index *p, Index Idx, Index* MAP, int *Offset)
 {
-	int j = threadIdx.x;
+	int j = (blockIdx.x * Threads / Units) + threadIdx.x;
 	if(j < Threads)
 	{
 		for (int i = 0; i != Step; i++)
@@ -214,12 +214,15 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		if(InvertOnGPU == true)
 		{
+			time_t start = clock();
+			ParallelBWT* CUDABWT;
 			unsigned char *d_BWT;
 			unsigned char *d_T;
 			Index* d_p;
 			Index* d_offset;
 			Index* d_MAP;
-
+			
+			cudaMalloc(&CUDABWT, sizeof(ParallelBWT) * Threads);
 			cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_T, sizeof(unsigned char) * newLen);
 			cudaMalloc(&d_MAP, sizeof(Index) * newLen); 
@@ -231,13 +234,34 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 			cudaMemcpy(d_MAP, MAP, sizeof(Index) * newLen, cudaMemcpyHostToDevice);
 			cudaMemcpy(d_p, p, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
 			cudaMemcpy(d_offset, offset, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
-
-			dim3 dimGrid(1, 1);
-			dim3 dimBlock(Threads, 1);
-			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
+			
+			int TryUnits = 100;
+			int CUDAUnits = TryUnits;
+			
+			while ((Threads % CUDAUnits) != 0)
+			{
+				if (CUDAUnits >= BWT_UNITS)
+				{
+					CUDAUnits = TryUnits;
+					while ((Threads % CUDAUnits) != 0)
+					{
+						if (CUDAUnits <= 0) Error("Arithmetic error has occurred!");
+						CUDAUnits--;
+					}
+					if((Threads % CUDAUnits) == 0) goto found;
+				}
+				CUDAUnits++;
+			}
+			found:
+			
+			dim3 dimGrid(CUDAUnits);
+			dim3 dimBlock(Threads/CUDAUnits);
+			
+			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, CUDAUnits, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
 			
 			cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost);
 			
+			cudaFree(CUDABWT);
 			cudaFree(d_BWT);
 			cudaFree(d_T);
 			cudaFree(d_MAP);
