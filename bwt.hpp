@@ -6,6 +6,7 @@
 
 #include "format.hpp"
 #include "divsufsort.hpp"
+#include "sys_detect.hpp"
 
 namespace BlockSort
 {
@@ -13,7 +14,7 @@ namespace BlockSort
 	{
 		public:
 		void ForwardBWT(Buffer Input, Buffer Output, Index *Indicies);
-		void InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGPU);
+		void InverseBWT(Buffer Input, Buffer Output, Index *Indicies, int Threads, bool UseGpu);
 		
 		class ParallelBWT
 		{
