@@ -146,11 +146,10 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 					if (N_Units <= 0) Error("Arithmetic error has occurred!");
 					N_Units--;
 				}
-				if((BWT_UNITS % (N_Units * Units)) == 0) goto next;
+				if((BWT_UNITS % (N_Units * Units)) == 0) break;
 			}
 			N_Units++;
 		}
-		next:
 		N_Units *= Units;
 		Threads = N_Units / Units;
 		
@@ -201,15 +200,7 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		for (int i = 0; i < N_Units; i++) 
 			offset[i] = step * i;
 
-		// INVERT 
-		ParallelBWT* pBWT = new ParallelBWT[Threads];			
-		for(int n = 0; n < Threads; n++)
-		{
-			int start = n * Units;
-			int end = (n+1) * Units;
-			pBWT[n].Load(BWT, T, step, &p[0], idx, MAP, &offset[0], start, end, N_Units);
-		}
-		
+		// INVERT 		
 		#ifdef __CUDACC__
 		if(InvertOnGPU == true)
 		{
@@ -219,17 +210,17 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 			Index* d_offset;
 			Index* d_MAP;
 
-			cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen);
-			cudaMalloc(&d_T, sizeof(unsigned char) * newLen);
-			cudaMalloc(&d_MAP, sizeof(Index) * newLen); 
-			cudaMalloc(&d_p, sizeof(Index) * N_Units);
-			cudaMalloc(&d_offset, sizeof(Index) * N_Units);
+			cudaAssert(cudaMalloc(&d_BWT, sizeof(unsigned char) * newLen));
+			cudaAssert(cudaMalloc(&d_T, sizeof(unsigned char) * newLen));
+			cudaAssert(cudaMalloc(&d_MAP, sizeof(Index) * newLen)); 
+			cudaAssert(cudaMalloc(&d_p, sizeof(Index) * N_Units));
+			cudaAssert(cudaMalloc(&d_offset, sizeof(Index) * N_Units));
 			
-			cudaMemcpy(d_BWT, BWT, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice);			
-			cudaMemcpy(d_T, T, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice);
-			cudaMemcpy(d_MAP, MAP, sizeof(Index) * newLen, cudaMemcpyHostToDevice);
-			cudaMemcpy(d_p, p, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
-			cudaMemcpy(d_offset, offset, sizeof(Index) * N_Units, cudaMemcpyHostToDevice);
+			cudaAssert(cudaMemcpy(d_BWT, BWT, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice));			
+			cudaAssert(cudaMemcpy(d_T, T, sizeof(unsigned char) * newLen, cudaMemcpyHostToDevice));
+			cudaAssert(cudaMemcpy(d_MAP, MAP, sizeof(Index) * newLen, cudaMemcpyHostToDevice));
+			cudaAssert(cudaMemcpy(d_p, p, sizeof(Index) * N_Units, cudaMemcpyHostToDevice));
+			cudaAssert(cudaMemcpy(d_offset, offset, sizeof(Index) * N_Units, cudaMemcpyHostToDevice));
 			
 			int TryUnits = 100;
 			int CudaUnits = TryUnits;
@@ -244,42 +235,62 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 						if (CudaUnits <= 0) Error("Arithmetic error has occurred!");
 						CudaUnits--;
 					}
-					if((Threads % CudaUnits) == 0) goto found;
+					if((Threads % CudaUnits) == 0) break;
 				}
 				CudaUnits++;
 			}
-			found:
 			
 			dim3 dimGrid(CudaUnits);
 			dim3 dimBlock(Threads/CudaUnits);
 			
 			CUDAInverse<<<dimGrid, dimBlock>>>(Threads, CudaUnits, d_BWT, d_T, step, &d_p[0], idx, d_MAP, &d_offset[0]);
 			
-			cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize(); // wait for gpu to finish 
 			
-			cudaFree(d_BWT);
-			cudaFree(d_T);
-			cudaFree(d_MAP);
-			cudaFree(d_p);
-			cudaFree(d_offset);
+			cudaAssert(cudaMemcpy(T, d_T, sizeof(unsigned char) * newLen, cudaMemcpyDeviceToHost));
+			
+			cudaAssert(cudaFree(d_BWT));
+			cudaAssert(cudaFree(d_T));
+			cudaAssert(cudaFree(d_MAP));
+			cudaAssert(cudaFree(d_p));
+			cudaAssert(cudaFree(d_offset));
 		}
 		else
 		{
+			ParallelBWT* pBWT = new ParallelBWT[Threads];			
+			for(int n = 0; n < Threads; n++)
+			{
+				int start = n * Units;
+				int end = (n+1) * Units;
+				pBWT[n].Load(BWT, T, step, &p[0], idx, MAP, &offset[0], start, end, N_Units);
+			}
 			#pragma omp parallel for num_threads(Threads) 
 			for(int n = 0; n < Threads; n++)
-			pBWT[n].ThreadedInversion();
+			{
+				pBWT[n].ThreadedInversion();
+			}
+			delete[] pBWT;
 		}
 		#endif
 		
 		#ifndef __CUDACC__
+		ParallelBWT* pBWT = new ParallelBWT[Threads];			
+		for(int n = 0; n < Threads; n++)
+		{
+			int start = n * Units;
+			int end = (n+1) * Units;
+			pBWT[n].Load(BWT, T, step, &p[0], idx, MAP, &offset[0], start, end, N_Units);
+		}
 		#pragma omp parallel for num_threads(Threads) 
 		for(int n = 0; n < Threads; n++)
+		{
 			pBWT[n].ThreadedInversion();
+		}
+		delete[] pBWT;
 		#endif
 		
 		delete[] p;
 		delete[] offset;
-		delete[] pBWT;
 		free(MAP);
 	}
 }
