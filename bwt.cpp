@@ -121,18 +121,21 @@ void BlockSort::BWT::InverseBWT(Buffer Input, Buffer Output, Index *Indicies, in
 		#ifdef __CUDACC__
 		bool InvertOnGPU = false;
 		
-		if(CheckCudaSupport() == true && UseGpu == true)
+		if(UseGpu == true)
 		{
-			uint64_t CudaMemory = GetCudaMemory();
-			if((CudaMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
+			if(CheckCudaSupport() == true)
 			{
-				Units = 1;
-				uint64_t CudaCores = GetCudaCoreCount();
-				if(CudaCores >= BWT_UNITS)
-					N_Units = Threads = BWT_UNITS;
-				else
-					N_Units = Threads = CudaCores;
-				InvertOnGPU = true;
+				uint64_t CudaMemory = GetCudaMemory();
+				if((CudaMemory * MAX_GPU_RESOURCES) > (newLen * (sizeof(Index) + (sizeof(unsigned char) * 2)))) // See if there's enough space to move everything to the GPU.
+				{
+					Units = 1;
+					uint64_t CudaCores = GetCudaCoreCount();
+					if(CudaCores >= BWT_UNITS)
+						N_Units = Threads = BWT_UNITS;
+					else
+						N_Units = Threads = CudaCores;
+					InvertOnGPU = true;
+				}
 			}
 		}
 		#endif
