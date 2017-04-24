@@ -6,6 +6,6 @@
 void Error(const char *string)
 {
 	printf ("\n Error: %s \n", string);		
-	exit(1);
+	exit(-1);
 }
 
