@@ -85,9 +85,6 @@ void Filters::Unreorder(unsigned char *in, unsigned char *out, int width, int le
 
 /**
 * Structural modelling, detect deltas and fixed points within the input and encode it
-* Acceleration is an optional parameter that restricts the filter to test only a small portion of each block.
-* Acceleration of 1 means use the most aggressive filtering, anything higher will run faster but perform worse.
-* The aggressiveness has no impact on decoding speed, just compression ratio and encode time.
 */
 void Filters::Encode(Buffer Input, Buffer Output)
 {
@@ -121,7 +118,7 @@ void Filters::Encode(Buffer Input, Buffer Output)
 				DeltaEncode(dbuf, boostread);
 				eScores[0][Ch] = eCalc->CalculateEntropy(dbuf, boostread);
 			}
-			else // order-0 statistics
+			else
 			{
 				eScores[0][Ch] = eCalc->CalculateEntropy(&Input.block[i], boostread);
 			}
@@ -169,7 +166,7 @@ void Filters::Encode(Buffer Input, Buffer Output)
 				memcpy(&Output.block[Outp], dbuf, len * sizeof(unsigned char));
 			}
 		}
-		else // order-0 statistics
+		else
 		{
 			memcpy(&Output.block[Outp], &Input.block[i], len * sizeof(unsigned char));
 		}
