@@ -5,7 +5,7 @@
 * This allows for higher compression because it clusters context permutations via frequency with cache friendly reordering.
 * It's parallel since it stores up to 840 indexes into the Bwt which can operate independently.
 **********************************************/
-#include "Bwt.hpp"
+#include "bwt.hpp"
 
 void BlockSort::Bwt::ParallelBwt::Load(unsigned char *_Bwt, unsigned char *_T, int _Step, Index *_p, Index _Idx, Index* _MAP, int *_Offset, int _Start, int _End, int _NU)
 {
