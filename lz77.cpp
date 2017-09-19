@@ -2,10 +2,6 @@
 * Lz77 compression and decompression code
 *
 * Lazy byte aligned lz77 with anti-contextual parsing. (It compresses the anti-context, eg: positional contexts, repeat distances, sparse contexts, all the things bwt cannot handle)
-* This weird encoder allows lz77 to never introduce contextual noise into the stream,
-* instead lz77 is used to induce positional contexts of binary data; in short: it only helps compression during worst cases.
-*
-* Notes: It only uses a hash chain for match finding, so it can be improved with a suffix array. This release is mainly proof of concept, suffix array version is in the works.
 **********************************************/
 #include "lz77.hpp"
 
@@ -200,7 +196,7 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 								match++;
 							Index curoff = cpos - ppos;
 							float ratio = Compressible(match, lit - k, curoff);
-							if((ratio > lowest_cost || match >= DUPE_MATCH) ) //|| Chhm->Peak(distance)
+							if((ratio > lowest_cost || match >= DUPE_MATCH) )
 							{
 								lowest_cost = ratio;
 								len = match;
@@ -211,12 +207,11 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 						itr++;
 					}
 				}
-				if(lowest_cost > 1.0 || len > DUPE_MATCH) //  && ((lit -= back - forward) != 0)
+				if(lowest_cost > 1.0 || len > DUPE_MATCH)
 				{
 					//Merge the match data
 					pos += forward; // correct current position
 					
-					//printf("position: %i, match: %i, offset: %i\n", pos, len, off);
 					// Store the best match in the current position
 					TokenBuffer[TokenIterator].match = len;
 					TokenBuffer[TokenIterator].offset = off;
@@ -229,7 +224,7 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 				pos++;
 				lit++;
 				if(pos % 1024 == 0)
-					printf(" %.2f%%\r", ((double)pos / (double)*Input.size) * 100);
+					printf(" %.2f%%\r", ((double)pos / (double)*Input.size) * 100); // SA match finding is very slow so show progress so user doesn't give up hope
 			}
 			
 			// Use a fast statistical model (chhm) to model the token chunk before encoding anything (find anti-contexts)
@@ -241,7 +236,8 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 			ChhmOffset->BuildModel();
 			ChhmMatch->BuildModel();
 			
-			// Figure out the best representation of the tokens using the chhm model, encode only the opposite of stable context tokens (the anti-context)
+			// Figure out the best representation of the tokens using the chhm model, TODO encode only the opposite of stable context tokens (the anti-context)
+			// Currently encodes positional redundancies
 			for (Index i = 0; i < TokenIterator; i++)
 			{
 				Index match = TokenBuffer[i].match;
@@ -527,8 +523,6 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 				lit = 0;
 			}
 			// store the best representation in the Chhm model, use this to find better matches
-			if(off)
-				Chhm->Update(off);
 			h = Hash32(&Input.block[pos]);
 			chain[pos % Window] = table[h];
 			table[h] = pos;
