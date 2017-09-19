@@ -1,82 +1,102 @@
 /*********************************************
 * Full compression and decompression code
+*
+* Note: The entire jam algorithm is transformation based, this allows for tunable encode parameters for 
+* stronger or weaker compression while maintaining fast decoding.
+*
+* The algorithm in a nutshell: 
+* 1) deduplication removes big identical blocks (limited to block size)
+* 2) filter can find structural redundancies, linear and non-linear 
+* 3) local model induces non-static to static distribution on short bursts of matches
+* 4) lz77 finds special cases and encodes them (positional contexts, etc...)
+* 5) bwt encodes the entire block
 **********************************************/
 #include "jampack.hpp"
 
+/**
+* 'Input' must always be the first read in and 'Output' must be the last read out.
+* If we need to feed the output into an input (for multiple stages) we just swap the pointers.
+*/
+void Jampack::SwapStreams()
+{
+	Buffer tmp = Input;
+	Input = Output;
+	Output = tmp;
+}
+
+/**
+* Compress a block using all compression stages.
+*/
 void Jampack::Comp()
 {
-	time_t start = clock();
-	cmethod = 0;
-	fmethod = 0;
-
 	crc = Chk->IntegrityCheck(Input);
-	Lz->Compress(Input, Output, 128);
-	Filter->Encode(Output, Input); 
-	LocalModel->Encode(Input, Output);
 	
-	Buffer tmp = Input;
-	Input = Output;
-	Output = tmp;
-	
-	Lz->Compress(Input, Output, 128);
-	Bwt->ForwardBwt(Output, Input, Indices);
-	Entropy->Encode(Input, Output);
+	Options Dedupe = Option;
+	Dedupe.MatchFinder = 0; // Set to 0 for deduplication
+	Lz->Compress		(Input, Output, Dedupe);	SwapStreams(); 	// Deduplicate big chunks (limited to block size)
+	Filter->Encode		(Input, Output, Option); 	SwapStreams(); 	// Filter any fixed points or linear projections (image, audio, triangular meshes, pretty much anything with a structure)
+	LocalModel->Encode	(Input, Output, Option); 	SwapStreams();	// Local prefix model (short localized match induction)
+	Lz->Compress		(Input, Output, Option);	SwapStreams(); 	// Compress data bwt cannot see (i.e: anti-contexts: sparse contexts, positional context, basically any non-markovian contexts)
+	Bwt->ForwardBwt		(Input, Output); 		SwapStreams(); 	// Burrows wheeler transform
+	Entropy->Encode		(Input, Output, Option);	// Structured rANS with large alphabet models
 }
-	
+
+/**
+* Decompress a block using inverse stages.
+*/
 void Jampack::Decomp()
 {
-	Entropy->Decode(Input, Output, Threads);
-	Bwt->InverseBwt(Output, Input, Indices, Threads, GPU);
-	Lz->Decompress(Input, Output);
-	LocalModel->Decode(Output, Input);
-
-	Buffer tmp = Input;
-	Input = Output;
-	Output = tmp;
-
-	Filter->Decode(Output, Input);
-	Lz->Decompress(Input, Output);
+	Entropy->Decode		(Input, Output, Option);	SwapStreams(); 	// Good!
+	Bwt->InverseBwt		(Input, Output, Option);	SwapStreams(); 	// Well... Try to add 2N decoding
+	Lz->Decompress		(Input, Output);		SwapStreams();	// Good!
+	LocalModel->Decode	(Input, Output, Option);	SwapStreams(); 	// Good!
+	Filter->Decode		(Input, Output);		SwapStreams();	// Good!	
+	Lz->Decompress		(Input, Output);
 	
 	if(crc != Chk->IntegrityCheck(Output)) 
 		Error("Detected corrupt block!"); 
 }
-	
-void Jampack::InitComp(int bsize)
+
+void Jampack::InitComp(Options Opt)
 {
-	Entropy = new Ans();
-	Bwt = new BlockSort::Bwt();
-	Lz = new Lz77();
-	Chk = new Checksum();
-	Filter = new Filters();
-	LocalModel = new Lpx();
+	Option = Opt;
+	Entropy = 	new Ans();
+	Bwt = 		new BlockSort::Bwt();
+	Lz = 		new Lz77();
+	Chk = 		new Checksum();
+	Filter = 	new Filters();
+	LocalModel = 	new Lpx();
 		
-	if(bsize < 0 || bsize < MIN_BLOCKSIZE || bsize > MAX_BLOCKSIZE) Error("Invalid blocksize!"); 
-	BlockSize = bsize;
+	if(Opt.BlockSize < 0 || Opt.BlockSize < MIN_BLOCKSIZE || Opt.BlockSize > MAX_BLOCKSIZE) 
+		Error("Invalid blocksize!"); 
+	
+	BlockSize = Opt.BlockSize;
 	int Buf = (int)(BlockSize) * 1.05;
 	Input.block = (unsigned char*)calloc(Buf, sizeof(unsigned char));
 	Output.block = (unsigned char*)calloc(Buf, sizeof(unsigned char));	
-	if (Input.block == NULL || Output.block == NULL) Error("Couldn't allocate Buffers!");
-		
-	Indices = (Index*)calloc(BWT_UNITS, sizeof(Index));
+	
+	if (Input.block == NULL || Output.block == NULL) 
+		Error("Couldn't allocate Buffers!");
+	
 	Input.size = (int*)calloc(1, sizeof(int));
 	Output.size = (int*)calloc(1, sizeof(int));
 }
-	
-void Jampack::InitDecomp(int t, bool gpu)
+
+void Jampack::InitDecomp(Options Opt)
 {
-	GPU = gpu;
-	Threads = t;
-	Entropy = new Ans();
-	Bwt = new BlockSort::Bwt();
-	Lz = new Lz77();
-	Chk = new Checksum();
-	Filter = new Filters();
-	LocalModel = new Lpx();
-	Indices = (int*)calloc(BWT_UNITS, sizeof(int));
+	Option = Opt;
+	Entropy = 	new Ans();
+	Bwt = 		new BlockSort::Bwt();
+	Lz = 		new Lz77();
+	Chk = 		new Checksum();
+	Filter = 	new Filters();
+	LocalModel = 	new Lpx();
 	Input.size = (int*)calloc(1, sizeof(int));
 	Output.size = (int*)calloc(1, sizeof(int));
+	Input.block = (unsigned char*)malloc(sizeof(unsigned char));
+	Output.block = (unsigned char*)malloc(sizeof(unsigned char));	
 }
-	
+
 void Jampack::Free()
 {
 	delete Filter;
@@ -87,43 +107,42 @@ void Jampack::Free()
 	delete LocalModel;
 	free(Output.block);
 	free(Input.block);
-	free(Indices);
 	free(Input.size);
 	free(Output.size);
 }
-	
+
 int Jampack::CompReadBlock(FILE *in)
 {
 	return *Input.size = fread(Input.block, 1, BlockSize, in);
 }
 	
+/**
+* Write header and compressed block
+*/
 void Jampack::CompWriteBlock(FILE *out)
 {
+	unsigned char *header = (unsigned char*)malloc((8 << 10) * sizeof(unsigned char));
+	if(header == NULL)
+		Error("Failed to allocate header space!");
+	
 	fwrite(&Magic, 1, strlen(Magic), out);
 	fwrite(&crc, 1, sizeof(int), out);
 	fwrite(Output.size, 1, sizeof(int), out);
-	for(int i = 0; i < BWT_UNITS; i++) 
-		fwrite(&Indices[i], 1, sizeof(Index), out);
-	fwrite(&cmethod, 1, sizeof(unsigned char), out);
-	fwrite(&fmethod, 1, sizeof(unsigned char), out);
 	fwrite(&BlockSize, 1, sizeof(Index), out);
 	fwrite(Output.block, 1, *Output.size, out); 
-}
 	
+	free(header);
+}
+
+/**
+* Read header and compressed block
+*/	
 int Jampack::DecompReadBlock(FILE *in)
 {
 	char Magic_check[MagicLength+1] = {0};
 	fread(&Magic_check, 1, strlen(Magic), in);
 	fread(&crc, 1, sizeof(int), in);
 	fread(Input.size, 1, sizeof(int), in);
-	for(int i = 0; i < BWT_UNITS; i++) 
-	{
-			fread(&Indices[i], 1, sizeof(Index), in);
-			if(Indices[i] < 0 || Indices[i] > MAX_BLOCKSIZE)
-				Error("Refusing to read from corrupt header!");
-	}
-	fread(&cmethod, 1, sizeof(unsigned char), in);
-	fread(&fmethod, 1, sizeof(unsigned char), in);
 	int e = fread(&BlockSize, 1, sizeof(Index), in);
 	if (e == 0 ) return 0;
 	else 
@@ -144,6 +163,9 @@ int Jampack::DecompReadBlock(FILE *in)
 	}
 }
 
+/**
+* Write out the decoded data
+*/
 void Jampack::DecompWriteBlock(FILE *out)
 {
 	fwrite(Output.block, 1, *Output.size, out); 
@@ -151,42 +173,43 @@ void Jampack::DecompWriteBlock(FILE *out)
 
 void Jampack::DisplayHeaderContents() 
 {
-	printf("CRCSSE: %08X\n", crc);
+	printf("CRC: %08X\n", crc);
 	printf("In size: %i\n", *Input.size);
 	printf("Out size: %i\n", *Output.size);
-	printf("Comp method: %i\n", cmethod);
-	printf("Filt method: %i\n", fmethod); // Outdated
 	printf("------------------\n");
 }
-	
-/*
-	This handles the IO and compressor instances shared among parallel threads. 
-	Multi-threading is written as instances of the compressor, in the case of the decompressor it uses multiple threads on a single compressed block.
-	Each instance can either directly compress using Jampack::Comp() or be given a posix thread to run on with Jampack::ThreadedComp(pthread). 
+
+/**
+*	This handles the IO and compressor instances shared among parallel threads. 
+*	Multi-threading is written as multiple instances of the compressor running in parallel.
 */
-void Jampack::Compress(FILE *in, FILE *out, int t, int bsize)
+void Jampack::Compress(FILE *in, FILE *out, Options Opt)
 {
-	if(t < MIN_THREADS) t = MIN_THREADS;
-	if(t > MAX_THREADS) t = MAX_THREADS;
-	if(bsize < MIN_BLOCKSIZE) bsize = MIN_BLOCKSIZE;
-	if(bsize > MAX_BLOCKSIZE) bsize = MAX_BLOCKSIZE;
+	if(Opt.Threads < MIN_THREADS) Opt.Threads = MIN_THREADS;
+	if(Opt.Threads > MAX_THREADS) Opt.Threads = MAX_THREADS;
+	if(Opt.BlockSize < MIN_BLOCKSIZE) Opt.BlockSize = MIN_BLOCKSIZE;
+	if(Opt.BlockSize > MAX_BLOCKSIZE) Opt.BlockSize = MAX_BLOCKSIZE;
 	
-	Jampack *jam = new Jampack[t];  if(jam == NULL) Error("Couldn't allocate model!");
-	for(int n = 0; n < t; n++) jam[n].InitComp(bsize);
+	Jampack *jam = new Jampack[Opt.Threads];  
+	if(jam == NULL) 
+		Error("Couldn't allocate compressor!");
 	
-	uint64_t raw = 0, comp = 0, ri = 0, ro = 0;
-	double ratio;
+	for(int n = 0; n < (int)Opt.Threads; n++) 
+		jam[n].InitComp(Opt);
+	
+	uint64_t raw = 0, comp = 0;
+	double ratio = 0;
 	time_t start, cur;
 	start = clock();
 	
 	while(1)
-	{ 
+	{
 		if(feof(in)) break;
 		int s = 0;
-		while(!feof(in) && (s < t))
+		while(!feof(in) && (s < (int)Opt.Threads))
 		{
 			jam[s].CompReadBlock(in);
-			ri += *jam[s].Input.size;
+			raw += *jam[s].Input.size;
 			s++;
 		}
 		#pragma omp parallel for num_threads(s)
@@ -197,53 +220,117 @@ void Jampack::Compress(FILE *in, FILE *out, int t, int bsize)
 		for(int n = 0; n < s; n++)
 		{
 			jam[n].CompWriteBlock(out);
-			ro += *jam[n].Output.size;
+			comp += *jam[n].Output.size;
 		}
 		
 		cur = clock();
-		raw = ri >> 10;
-		comp = ro >> 10;
-		ratio = ((float)comp / (float)raw) * 100;
-		double rate = (raw>>10) / (((double)cur - (double)start) / CLOCKS_PER_SEC);
-		printf("Read: %i MB => %i MB (%.2f%%) @ %.2f MB/s        \r", (int)(raw >> 10), (int)(comp >> 10), ratio, rate);
+		ratio = ((double)comp / (double)raw) * 100;
+		double rate = (raw / (double)(1000000)) / (((double)cur - (double)start) / CLOCKS_PER_SEC);
+		printf("Read: %.2f MB => %.2f MB (%.2f%%) @ %.2f MB/s        \r", (double)raw / (double)(1000000), (double)comp / (double)(1000000), ratio, rate);
 	}
-	printf("Read: %i MB => %i MB (%.2f%%)\n", (int)(raw >> 10), (int)(comp >> 10), ratio);
-	for(int n = 0; n < t; n++) jam[n].Free();
+	printf("Read: %.2f MB => %.2f MB (%.2f%%)\n", (double)raw / (double)(1000000), (double)comp / (double)(1000000), ratio);
+
+	for(int n = 0; n < (int)Opt.Threads; n++) 
+		jam[n].Free();
 	delete[] jam;
 }
 
-void Jampack::Decompress(FILE *in, FILE *out, int t, bool gpu) 
+/**
+* There are two decoder configurations, parallel on a single block, and parallel multi-block (multiple blocks with their own internal threads as well as external threads).
+* By default Jampack is parallel on a single block since this mode requires a constant amount of memory for decoding.
+* Multi-block decoding is very memory intensive, is loads multiple blocks to run in "parallel on a single block" mode. Hence the higher memory usage.
+*/
+void Jampack::Decompress(FILE *in, FILE *out, Options Opt) 
 {
-	if(t < MIN_THREADS) t = MIN_THREADS;
-	if(t > MAX_THREADS) t = MAX_THREADS;
-	
-	Jampack *jam = new Jampack();
-	jam->InitDecomp(t, gpu); // Set decoder to run with the selected number of threads on cpu or gpu
+	if(Opt.Threads < MIN_THREADS) Opt.Threads = MIN_THREADS;
+	if(Opt.Threads > MAX_THREADS) Opt.Threads = MAX_THREADS;
 		
-	uint64_t raw = 0, comp = 0, ri = 0, ro = 0;
-	double ratio;
-	time_t start, cur;
-	start = clock();
-	
-	while(1)
-	{ 
-		if(feof(in)) break;
-		if(jam->DecompReadBlock(in) > 0)
-		{
-			ri += *jam->Input.size;		
-			jam->Decomp();
-			jam->DecompWriteBlock(out);
-			ro += *jam->Output.size;			
+	// Decode using multiple threads working on a single block
+	if(Opt.Multiblock == false)
+	{
+		Jampack *jam = new Jampack();
+		if(jam == NULL)
+			Error("Couldn't allocate decompressor!");
+		
+		jam->InitDecomp(Opt); // Set decoder to run with the selected number of threads on cpu or gpu (6N Memory)
+			
+		uint64_t raw = 0, comp = 0;
+		double ratio = 0;
+		time_t start, cur;
+		start = clock();
+		
+		while(1)
+		{ 
+			if(feof(in)) break;
+			if(jam->DecompReadBlock(in) > 0)
+			{
+				comp += *jam->Input.size;		
+				jam->Decomp();
+				jam->DecompWriteBlock(out);
+				raw += *jam->Output.size;			
+			}
+			
+			cur = clock();
+			ratio = ((double)comp / (double)raw) * 100;
+			double rate = (raw / (double)(1000000)) / (((double)cur - (double)start) / CLOCKS_PER_SEC);
+			printf("Read: %.2f MB => %.2f MB (%.2f%%) @ %.2f MB/s        \r", (double)comp / (double)(1000000), (double)raw / (double)(1000000), ratio, rate);
 		}
-		
-		cur = clock();
-		raw = ri >> 10;
-		comp = ro >> 10;
-		ratio = ((float)raw / (float)comp) * 100;
-		double rate = (comp>>10) / (((double)cur - (double)start) / CLOCKS_PER_SEC);
-		printf("Read: %i MB => %i MB (%.2f%%) @ %.2f MB/s        \r", (int)(raw >> 10), (int)(comp >> 10), ratio, rate);
+		printf("Read: %.2f MB => %.2f MB (%.2f%%)\n", (double)comp / (double)(1000000), (double)raw / (double)(1000000), ratio);
+
+		jam->Free();
+		delete jam;
 	}
-	printf("Read: %i MB => %i MB (%.2f%%)\n", (int)(raw >> 10), (int)(comp >> 10), ratio);
-	jam->Free();
-	delete jam;
+	// Decode using multiple threads on multiple blocks with their own internal threads(6N*K Memory, very fast when there are multiple blocks available)
+	else
+	{
+		Jampack *jam = new Jampack[Opt.Threads];  
+		if(jam == NULL) 
+			Error("Couldn't allocate decompressor!");
+		
+		for(int n = 0; n < (int)Opt.Threads; n++) 
+			jam[n].InitDecomp(Opt); // This initializes twice the amount of threads the system has but allows for very flexible parallelism to take place
+		
+		uint64_t raw = 0, comp = 0;
+		double ratio = 0;
+		time_t start, cur;
+		start = clock();
+		
+		while(1)
+		{
+			if(feof(in)) break;
+			int s = 0;
+			while(!feof(in) && (s < Opt.Threads))
+			{
+				if(jam[s].DecompReadBlock(in) > 0)
+				{
+					comp += *jam[s].Input.size;		
+					s++;
+				}
+				else
+					break;
+			}
+			
+			#pragma omp parallel for num_threads(s)
+			for(int n = 0; n < s; n++)
+			{
+				jam[n].Decomp();
+			}
+			for(int n = 0; n < s; n++)
+			{
+				jam[n].DecompWriteBlock(out);
+				raw += *jam[n].Output.size;
+			}
+
+			cur = clock();
+			ratio = ((double)comp / (double)raw) * 100;
+			double rate = (raw / (double)(1000000)) / (((double)cur - (double)start) / CLOCKS_PER_SEC);
+			printf("Read: %.2f MB => %.2f MB (%.2f%%) @ %.2f MB/s        \r", (double)comp / (double)(1000000), (double)raw / (double)(1000000), ratio, rate);
+		}
+		printf("Read: %.2f MB => %.2f MB (%.2f%%)\n", (double)comp / (double)(1000000), (double)raw / (double)(1000000), ratio);
+		
+		
+		for(int n = 0; n < (int)Opt.Threads; n++) 
+			jam[n].Free();
+		delete jam;
+	}
 }
