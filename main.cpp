@@ -1,12 +1,7 @@
 /*********************************************
 * Jampack - General purpose compression algorithm by Lucas Marsh (c) 2017
 * Jampack uses a hybrid of bwt, lz77, prefix modeling, and filters to achieve very high compression at reasonable decode speed and memory.
-* Encode memory is 6NK, decode memory is 3N by default (using all threads on a single block), or 3NK with multi-block enabled (using all threads with multiple parallel decoders).
-*
-Sorry for the long wait, jampack v0.8 is now out, it features new filters (inline delta, hueristic encoding, brute force is now an option), more aggressive local prefix induction (variable order), 
-and a neat match-finder mode for induction of anti-contexts (non-markovian correlations, eg: sparse and positional contexts) via lz77 though since this it's pretty new so there's quite a bit of room for better anti-context parsing hueristics, 
-also burrows wheeler decoding is now reduced from 6N to 3N in memory without any speed loss. Let me know if you manage to break it :)
-* Note: 2N inverse alias bwt is on the way.
+* Encode memory is 6NK, decode memory is 6N by default (using all threads on a single block), or 6NK with multi-block enabled (using all threads with multiple parallel decoders).
 **********************************************/
 #include "jampack.hpp"
 
