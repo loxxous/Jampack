@@ -131,7 +131,7 @@ void Lz77::Compress(Buffer Input, Buffer Output, Options Opt)
 		Opt.MatchFinder = 2;
 	int mode = Opt.MatchFinder;
 
-	if(mode == 2) // smallest but slowest (activated with -m2 flag) suffix array modeling, uses ISA, SA, and LPC for O(n)~ish optimal parsing 
+	if(mode == 2) // smallest but slowest (activated with -m2 flag) suffix array modeling, uses ISA and SA (note: incredibly slow)
 	{
 		Index *SA = (Index*)malloc(*Input.size * sizeof(Index)); 
 		Index *ISA = (Index*)malloc(*Input.size * sizeof(Index)); 
